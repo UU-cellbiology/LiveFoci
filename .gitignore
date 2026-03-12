@@ -1,0 +1,21 @@
+# Ignore test scripts
+pipeline/quantify*.ipynb
+pipeline/register_cells.ipynb
+pipeline/make_paper_figures.ipynb
+pipeline/foci_detectors.ipynb
+Make_MaxProj_livecell
+
+# Ignore IDE settings
+.ipynb_checkpoints/
+pipeline/.ipynb_checkpoints/
+pipeline/_pycache_
+
+# Ignore fils
+data/
+data_test_subsampling
+EBRT_vs_PRRT/
+Ho_Y_data/
+Inhibitor/
+paper/
+tracking/
+
