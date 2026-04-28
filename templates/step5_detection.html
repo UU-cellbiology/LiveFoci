@@ -1,0 +1,568 @@
+{% extends "base.html" %}
+
+{% block title %}Step 5 – Foci Detection{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <span class="badge bg-primary fs-6 me-3">Step 5</span>
+  <h4 class="fw-bold mb-0">Foci Detection</h4>
+</div>
+
+<div class="row g-4">
+
+  <!-- ════════════════════════════════════════════════════════
+       LEFT COLUMN
+       ════════════════════════════════════════════════════════ -->
+  <div class="col-xl-4 col-lg-5">
+
+    <!-- ── Data ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-folder2-open text-primary"></i> Data
+      </div>
+      <div class="card-body">
+        <div class="mb-2">
+          <label class="form-label param-label">Data folder</label>
+          <input id="dataPath" type="text" class="form-control form-control-sm"
+                 value="{{ default_data_path }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label param-label">
+            Glob pattern
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Pattern to find registered cell stacks produced by Step 4."></i>
+          </label>
+          <input id="pattern" type="text" class="form-control form-control-sm"
+                 value="*/Pos*/results/registered/*/*.tif">
+        </div>
+        <button class="btn btn-sm btn-outline-primary w-100" onclick="discoverPaths()">
+          <i class="bi bi-search me-1"></i>Discover cell stacks
+        </button>
+        <div id="pathsInfo" class="mt-2 text-muted small"></div>
+      </div>
+    </div>
+
+    <!-- ── Detection method ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-sliders text-primary"></i> Detection method
+      </div>
+      <div class="card-body">
+
+        <div class="mb-3">
+          <label class="form-label param-label">
+            Detector
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Algorithm used to enhance and detect foci"></i>
+          </label>
+          <select id="method" class="form-select form-select-sm" onchange="onMethodChange()">
+            <option value="TopHat" selected>TopHat</option>
+            <option value="Wavelets">Wavelets</option>
+            <option value="LOG">LOG – Laplacian of Gaussian</option>
+            <option value="Hessian">Hessian</option>
+            <option value="HDome">H-Dome</option>
+            <option value="HDome-smal">H-Dome (Smal et al.)</option>
+            <option value="MPHD">MPHD</option>
+            <option value="Spotiflow">Spotiflow (deep learning)</option>
+          </select>
+        </div>
+
+        <!-- ── per-method params ── -->
+
+        <div id="params-TopHat" class="method-params">
+          <div class="row g-2 align-items-center mb-1">
+            <div class="col param-label">Sigma
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Gaussian pre-smoothing sigma before the top-hat filter."></i>
+            </div>
+            <div class="col-5"><input type="range" class="form-range" data-param="sigma"
+              min="0.1" max="5" step="0.1" value="0.6" oninput="showVal(this,'tophat_sigma_v')"></div>
+            <div class="col-auto param-value-display" id="tophat_sigma_v">0.6</div>
+          </div>
+          <div class="row g-2 align-items-center">
+            <div class="col param-label">Radius (px)
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Radius of the disk structuring element. Should match your foci size in pixels."></i>
+            </div>
+            <div class="col-5"><input type="range" class="form-range" data-param="radius"
+              min="1" max="20" step="0.5" value="6" oninput="showVal(this,'tophat_radius_v')"></div>
+            <div class="col-auto param-value-display" id="tophat_radius_v">6.0</div>
+          </div>
+        </div>
+
+        <div id="params-Wavelets" class="method-params" style="display:none">
+          <div class="row g-2 align-items-center mb-1">
+            <div class="col param-label">K (scales)
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Number of wavelet decomposition scales."></i>
+            </div>
+            <div class="col-5"><input type="range" class="form-range" data-param="K"
+              min="1" max="10" step="1" value="3" oninput="showVal(this,'wl_K_v')"></div>
+            <div class="col-auto param-value-display" id="wl_K_v">3</div>
+          </div>
+          <div class="row g-2 align-items-center mb-1">
+            <div class="col param-label">Factor
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Multiplier for the significance threshold on wavelet coefficients."></i>
+            </div>
+            <div class="col-5"><input type="range" class="form-range" data-param="factor"
+              min="1" max="10" step="0.5" value="4" oninput="showVal(this,'wl_factor_v')"></div>
+            <div class="col-auto param-value-display" id="wl_factor_v">4.0</div>
+          </div>
+          <div class="row g-2 align-items-center">
+            <div class="col param-label">Start scale
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="First scale used in the reconstruction. Increase to ignore large-scale structures. Should be smaller then K"></i>
+            </div>
+            <div class="col-5"><input type="range" class="form-range" data-param="start_scale"
+              min="0" max="5" step="1" value="0" oninput="showVal(this,'wl_ss_v')"></div>
+            <div class="col-auto param-value-display" id="wl_ss_v">0</div>
+          </div>
+        </div>
+
+        <div id="params-LOG" class="method-params" style="display:none">
+          <div class="row g-2 align-items-center">
+            <div class="col param-label">Sigma
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Standard deviation for the Gaussian smoothing step."></i>
+            </div>
+            <div class="col-5"><input type="range" class="form-range" data-param="sigma"
+              min="0.1" max="5" step="0.1" value="0.8" oninput="showVal(this,'log_sigma_v')"></div>
+            <div class="col-auto param-value-display" id="log_sigma_v">0.8</div>
+          </div>
+        </div>
+
+        <div id="params-Hessian" class="method-params" style="display:none">
+          <div class="row g-2 align-items-center">
+            <div class="col param-label">Sigma
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Standard deviation for the Gaussian blurring step."></i>
+            </div>
+            <div class="col-5"><input type="range" class="form-range" data-param="sigma"
+              min="0.1" max="5" step="0.1" value="0.5" oninput="showVal(this,'hess_sigma_v')"></div>
+            <div class="col-auto param-value-display" id="hess_sigma_v">0.5</div>
+          </div>
+        </div>
+
+        <div id="params-HDome" class="method-params" style="display:none">
+          <div class="row g-2 align-items-center">
+            <div class="col param-label">H (dome height)
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Height of the h-dome used to suppress background."></i>
+            </div>
+            <div class="col-5"><input type="range" class="form-range" data-param="h"
+              min="1" max="200" step="1" value="50" oninput="showVal(this,'hdome_h_v')"></div>
+            <div class="col-auto param-value-display" id="hdome_h_v">50</div>
+          </div>
+        </div>
+
+        <div id="params-HDome-smal" class="method-params" style="display:none">
+          <div class="row g-2 align-items-center mb-1">
+            <div class="col param-label">Sigma
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Standard deviation for the LOG pre-filter applied before the h-dome transform."></i>
+            </div>
+            <div class="col-5"><input type="range" class="form-range" data-param="sigma"
+              min="0.1" max="5" step="0.1" value="1.2" oninput="showVal(this,'hdomes_sigma_v')"></div>
+            <div class="col-auto param-value-display" id="hdomes_sigma_v">1.2</div>
+          </div>
+          <div class="row g-2 align-items-center mb-1">
+            <div class="col param-label">H (dome height)</div>
+            <div class="col-5"><input type="range" class="form-range" data-param="h"
+              min="1" max="200" step="1" value="80" oninput="showVal(this,'hdomes_h_v')"></div>
+            <div class="col-auto param-value-display" id="hdomes_h_v">80</div>
+          </div>
+          <div class="row g-2 align-items-center">
+            <div class="col param-label">S (exponent)</div>
+            <div class="col-5"><input type="range" class="form-range" data-param="s"
+              min="0.5" max="5" step="0.1" value="1.5" oninput="showVal(this,'hdomes_s_v')"></div>
+            <div class="col-auto param-value-display" id="hdomes_s_v">1.5</div>
+          </div>
+        </div>
+
+        <div id="params-MPHD" class="method-params" style="display:none">
+          <div class="row g-2 align-items-center mb-1">
+            <div class="col param-label">Sigma
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Standard deviation for the Gaussian pre-smoothing step."></i>
+            </div>
+            <div class="col-5"><input type="range" class="form-range" data-param="sigma"
+              min="0.1" max="5" step="0.1" value="0.5" oninput="showVal(this,'mphd_sigma_v')"></div>
+            <div class="col-auto param-value-display" id="mphd_sigma_v">0.5</div>
+          </div>
+          <div class="row g-2 align-items-center mb-1">
+            <div class="col param-label">H init
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Initial small h-dome height used to find candidate local maxima."></i>
+            </div>
+            <div class="col-5"><input type="range" class="form-range" data-param="h_init"
+              min="1" max="50" step="1" value="5" oninput="showVal(this,'mphd_h_v')"></div>
+            <div class="col-auto param-value-display" id="mphd_h_v">5</div>
+          </div>
+          <div class="row g-2 align-items-center">
+            <div class="col param-label">R (search radius)
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Pixel radius searched around each candidate maximum to compute the maximum possible height. Should be larger than your foci size."></i>
+            </div>
+            <div class="col-5"><input type="range" class="form-range" data-param="R"
+              min="1" max="30" step="1" value="10" oninput="showVal(this,'mphd_R_v')"></div>
+            <div class="col-auto param-value-display" id="mphd_R_v">10</div>
+          </div>
+        </div>
+
+        <div id="params-Spotiflow" class="method-params" style="display:none">
+          <p class="text-muted small mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            Uses the pretrained <code>general</code> model. No additional parameters.
+          </p>
+        </div>
+
+        <!-- shown only when Spotiflow is selected -->
+        <div id="spotiflow-threshold-note" class="alert alert-info py-1 px-2 mt-2 mb-0"
+             style="display:none; font-size:0.8rem">
+          <i class="bi bi-info-circle-fill me-1"></i>
+          Spotiflow threshold is a <strong>detection probability</strong> (0 – 1).
+          Lower values detect more spots; typical range 0.3 – 0.7.
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Detection threshold & options ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-sliders2 text-primary"></i> Threshold &amp; options
+      </div>
+      <div class="card-body">
+        <div class="row g-2 align-items-center mb-2">
+          <div class="col param-label">
+            Detection threshold
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Minimum value of the enhanced image required to register a local maximum as a detection. Increase to reduce false positives."></i>
+          </div>
+          <div class="col-5">
+            <input type="number" id="threshold" class="form-control form-control-sm"
+                   value="36" min="0" step="any"
+                   style="text-align:right; -moz-appearance:textfield; appearance:textfield">
+            <style>
+              #threshold::-webkit-outer-spin-button,
+              #threshold::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+            </style>
+          </div>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="return_seg" checked>
+          <label class="form-check-label param-label" for="return_seg">
+            Save spot segmentation
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="When enabled, saves spot_segmentation.tif next to each stack. Optionally can be used for Trackastra foci tracking."></i>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Actions ── -->
+    <div class="card">
+      <div class="card-body">
+        <div class="d-grid gap-2">
+          <button id="previewBtn" class="btn btn-outline-primary" onclick="runPreview()" disabled>
+            <span id="previewSpinner" class="spinner-border spinner-border-sm me-2"
+                  style="display:none" role="status"></span>
+            <i class="bi bi-eye me-1"></i>Preview (4 random cells)
+          </button>
+          <button id="runBtn" class="btn btn-primary" onclick="runAll()" disabled>
+            <i class="bi bi-play-fill me-1"></i>Run detection on all data
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="yamlBadge" class="text-success small mt-1" style="display:none">
+      <i class="bi bi-check2-circle me-1"></i>Parameters saved to parameters.yml
+    </div>
+
+  </div><!-- /left column -->
+
+
+  <!-- ════════════════════════════════════════════════════════
+       RIGHT COLUMN
+       ════════════════════════════════════════════════════════ -->
+  <div class="col-xl-8 col-lg-7">
+
+    <!-- Preview panel -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-grid text-primary"></i> Preview — foci detection
+      </div>
+      <div class="card-body" id="previewResults">
+        <p class="text-muted small mb-0">
+          <i class="bi bi-arrow-left me-1"></i>
+          Click <strong>Preview</strong> to run detection on 4 random cells.
+          Rows: input &nbsp;/&nbsp; detected (cyan circles) &nbsp;/&nbsp; enhanced signal.
+        </p>
+      </div>
+    </div>
+
+    <!-- Progress panel -->
+    <div class="card" id="progressCard" style="display:none">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-bar-chart-steps text-primary"></i> Run progress
+      </div>
+      <div class="card-body">
+        <div class="progress mb-3" style="height: 22px;">
+          <div id="progressBar"
+               class="progress-bar progress-bar-striped progress-bar-animated"
+               role="progressbar" style="width: 0%">0 / 0</div>
+        </div>
+        <div id="progressLog" class="log-box"></div>
+      </div>
+    </div>
+
+  </div><!-- /right column -->
+
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+    new bootstrap.Tooltip(el);
+  });
+
+  const DEFAULT_THRESHOLDS = {
+    'TopHat': 36, 'Wavelets': 30, 'LOG': 26, 'Hessian': 5,
+    'HDome': 40, 'HDome-smal': 20, 'MPHD': 20, 'Spotiflow': 0.55,
+  };
+
+  let discoveredPaths = [];
+  let currentTaskId   = null;
+  let pollingTimer    = null;
+
+  function showVal(input, displayId) {
+    document.getElementById(displayId).textContent =
+      parseFloat(input.value).toFixed(input.step && input.step < 1 ? 1 : 0);
+  }
+
+  function onMethodChange() {
+    const method = document.getElementById('method').value;
+    document.querySelectorAll('.method-params').forEach(el => el.style.display = 'none');
+    document.getElementById('params-' + method).style.display = '';
+    document.getElementById('threshold').value = DEFAULT_THRESHOLDS[method] ?? 20;
+    const isSpotiflow = method === 'Spotiflow';
+    document.getElementById('spotiflow-threshold-note').style.display = isSpotiflow ? '' : 'none';
+  }
+
+  function setActionButtons(enabled) {
+    document.getElementById('previewBtn').disabled = !enabled;
+    document.getElementById('runBtn').disabled     = !enabled;
+  }
+
+  // ── discover ───────────────────────────────────────────────────────────────
+  async function discoverPaths() {
+    const info = document.getElementById('pathsInfo');
+    info.textContent = 'Searching…';
+    setActionButtons(false);
+
+    const resp = await fetch('/api/discover_paths', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        data_path: document.getElementById('dataPath').value,
+        pattern:   document.getElementById('pattern').value,
+      }),
+    });
+    const data = await resp.json();
+
+    if (data.success) {
+      discoveredPaths = data.paths;
+      if (data.count === 0) {
+        info.innerHTML = '<span class="text-warning">No stacks found – check path &amp; pattern.</span>';
+      } else {
+        info.innerHTML =
+          `<span class="text-success"><i class="bi bi-check2 me-1"></i>` +
+          `Found <strong>${data.count}</strong> cell stack(s).</span>`;
+        setActionButtons(true);
+      }
+    } else {
+      info.innerHTML = `<span class="text-danger">Error: ${data.error}</span>`;
+    }
+  }
+
+  function getParams() {
+    const method = document.getElementById('method').value;
+    const params = {
+      data_path:          document.getElementById('dataPath').value,
+      reg_paths:          discoveredPaths,
+      method:             method,
+      threshold:          parseFloat(document.getElementById('threshold').value),
+      return_segmentation: document.getElementById('return_seg').checked,
+    };
+
+    // collect method-specific params from the visible group
+    document.querySelectorAll(`#params-${method} [data-param]`).forEach(el => {
+      const key = el.getAttribute('data-param');
+      params[key] = (el.type === 'text' || el.tagName === 'SELECT')
+        ? el.value
+        : parseFloat(el.value);
+    });
+
+    return params;
+  }
+
+  // ── preview ────────────────────────────────────────────────────────────────
+  async function runPreview() {
+    const btn     = document.getElementById('previewBtn');
+    const spinner = document.getElementById('previewSpinner');
+    const panel   = document.getElementById('previewResults');
+
+    btn.disabled = true;
+    spinner.style.display = 'inline-block';
+    panel.innerHTML =
+      '<p class="text-muted small"><i class="bi bi-hourglass-split me-1"></i>' +
+      'Running detection – please wait…</p>';
+
+    try {
+      const resp = await fetch('/api/preview_detection', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(getParams()),
+      });
+      const data = await resp.json();
+
+      if (data.success) {
+        renderPreview(data);
+      } else {
+        panel.innerHTML =
+          `<div class="alert alert-danger mb-0"><strong>Error:</strong> ${data.error}</div>`;
+      }
+    } catch (e) {
+      panel.innerHTML =
+        `<div class="alert alert-danger mb-0">Request failed: ${e.message}</div>`;
+    } finally {
+      btn.disabled = false;
+      spinner.style.display = 'none';
+    }
+  }
+
+  function renderPreview(data) {
+    const panel = document.getElementById('previewResults');
+    const rows  = ['raw', 'overlay', 'enhanced'];
+    const labels = ['Input', 'Detected', 'Enhanced'];
+
+    let html = `<div class="table-responsive">
+      <table class="table table-borderless preview-table mb-0">
+        <thead><tr>
+          <th style="width:24px"></th>`;
+    data.cells.forEach(c => {
+      html += `<th class="text-center" style="font-size:0.75rem; color:#6c757d">
+                 ${escapeHtml(c.cell)}<br>
+                 <span class="badge bg-secondary">${c.n_foci} foci</span>
+                 <span class="text-muted" style="font-size:0.7rem"> t=${c.frame}</span>
+               </th>`;
+    });
+    html += `</tr></thead><tbody>`;
+
+    rows.forEach((key, ri) => {
+      html += `<tr><td class="row-label">${labels[ri]}</td>`;
+      data.cells.forEach(c => {
+        html += `<td style="padding:2px">
+          <img src="data:image/png;base64,${c[key]}"
+               class="preview-img" style="max-width:220px; background:#000;">
+        </td>`;
+      });
+      html += `</tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+    panel.innerHTML = html;
+  }
+
+  // ── run all ────────────────────────────────────────────────────────────────
+  async function runAll() {
+    const runBtn       = document.getElementById('runBtn');
+    const progressCard = document.getElementById('progressCard');
+    const bar          = document.getElementById('progressBar');
+    const log          = document.getElementById('progressLog');
+
+    runBtn.disabled = true;
+    progressCard.style.display = '';
+    bar.style.width = '0%';
+    bar.textContent = '0 / 0';
+    bar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+    log.innerHTML = '';
+
+    try {
+      const resp = await fetch('/api/run_detection', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(getParams()),
+      });
+      const data = await resp.json();
+
+      if (!data.success) {
+        appendLog(log, data.error, 'log-err');
+        runBtn.disabled = false;
+        return;
+      }
+
+      currentTaskId = data.task_id;
+      if (data.yaml_saved) document.getElementById('yamlBadge').style.display = '';
+      startPolling();
+    } catch (e) {
+      appendLog(log, `Request failed: ${e.message}`, 'log-err');
+      runBtn.disabled = false;
+    }
+  }
+
+  function startPolling() {
+    if (pollingTimer) clearInterval(pollingTimer);
+    pollingTimer = setInterval(pollProgress, 1200);
+  }
+
+  async function pollProgress() {
+    try {
+      const resp = await fetch(`/api/progress/${currentTaskId}`);
+      const data = await resp.json();
+      if (!data.success) return;
+
+      const bar = document.getElementById('progressBar');
+      const log = document.getElementById('progressLog');
+
+      const pct = data.total > 0 ? Math.round(data.progress / data.total * 100) : 0;
+      bar.style.width  = pct + '%';
+      bar.textContent  = `${data.progress} / ${data.total}`;
+
+      log.innerHTML = data.log.map(line => {
+        const cls = line.startsWith('ERROR')  ? 'log-err'
+                  : line.includes('saved')
+                    || line === 'All done!'   ? 'log-ok'
+                  : '';
+        return `<span class="${cls}">${escapeHtml(line)}</span>`;
+      }).join('\n');
+      log.scrollTop = log.scrollHeight;
+
+      if (data.status === 'done') {
+        clearInterval(pollingTimer);
+        bar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+        bar.classList.add('bg-success');
+        document.getElementById('runBtn').disabled = false;
+      } else if (data.status === 'error') {
+        clearInterval(pollingTimer);
+        bar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+        bar.classList.add('bg-danger');
+        document.getElementById('runBtn').disabled = false;
+      }
+    } catch (_) { /* network blip */ }
+  }
+
+  function appendLog(el, text, cls) {
+    el.innerHTML += `<span class="${cls || ''}">${escapeHtml(text)}</span>\n`;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+{% endblock %}

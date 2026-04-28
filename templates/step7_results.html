@@ -1,0 +1,491 @@
+{% extends "base.html" %}
+
+{% block title %}Step 7 – Results{% endblock %}
+
+{% block head %}
+<style>
+  .cond-table th, .cond-table td { vertical-align: middle; font-size: 0.82rem; padding: 4px 6px; }
+  .cond-color { width: 36px; height: 28px; padding: 2px 3px; border-radius: 4px; cursor: pointer; }
+  .cond-hatch { width: 70px; font-size: 0.78rem; }
+  .plot-img { width: 100%; border-radius: 6px; border: 1px solid #dee2e6; }
+  .stats-box {
+    font-family: monospace;
+    font-size: 0.78rem;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    max-height: 320px;
+    overflow-y: auto;
+    white-space: pre;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <span class="badge bg-primary fs-6 me-3">Step 7</span>
+  <h4 class="fw-bold mb-0">Results</h4>
+</div>
+
+<div class="row g-4">
+
+  <!-- ════════════════════════════════════════════════════════
+       LEFT COLUMN – parameters
+       ════════════════════════════════════════════════════════ -->
+  <div class="col-xl-4 col-lg-5">
+
+    <!-- ── Data folder ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-folder2-open text-primary"></i> Data
+      </div>
+      <div class="card-body">
+        <div class="mb-2">
+          <label class="form-label param-label">Data folder</label>
+          <input id="dataPath" type="text" class="form-control form-control-sm"
+                 value="{{ default_data_path }}">
+        </div>
+        <button class="btn btn-sm btn-outline-primary w-100" onclick="discoverConditions()">
+          <i class="bi bi-search me-1"></i>Discover conditions
+        </button>
+        <div id="discoverInfo" class="mt-2 text-muted small"></div>
+      </div>
+    </div>
+
+    <!-- ── Timing ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-clock text-primary"></i> Timing
+      </div>
+      <div class="card-body">
+        <div class="row g-2 align-items-center mb-2">
+          <div class="col param-label">
+            Number of frames
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Total number of frames acquired in the time-lapse."></i>
+          </div>
+          <div class="col-5">
+            <input type="number" class="form-control form-control-sm" id="num_frames"
+                   value="288" min="1" step="1">
+          </div>
+        </div>
+        <div class="row g-2 align-items-center mb-2">
+          <div class="col param-label">
+            Frame interval (min)
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Time between frames in minutes (dt)."></i>
+          </div>
+          <div class="col-5">
+            <input type="number" class="form-control form-control-sm" id="dt"
+                   value="5" min="0.1" step="0.5">
+          </div>
+        </div>
+        <div class="row g-2 align-items-center mb-2">
+          <div class="col param-label">
+            Time offset (min)
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Time offset in minutes added to the x-axis (e.g. to account for microscope setup time)."></i>
+          </div>
+          <div class="col-5">
+            <input type="number" class="form-control form-control-sm" id="time_offset"
+                   value="15" min="0" step="1">
+          </div>
+        </div>
+        <div class="row g-2 align-items-center">
+          <div class="col param-label">
+            Remove final frames
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Drop this many frames from the end of the active-tracks plot to avoid the artificial drop caused by the minimum track length."></i>
+          </div>
+          <div class="col-5">
+            <input type="number" class="form-control form-control-sm" id="remove_final_frames"
+                   value="4" min="0" step="1">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Plot limits ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-sliders text-primary"></i> Plot limits
+      </div>
+      <div class="card-body">
+        <div class="row g-2 align-items-center mb-2">
+          <div class="col param-label">
+            Active tracks max
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Upper y-axis limit for the active tracks over time plot."></i>
+          </div>
+          <div class="col-5">
+            <input type="number" class="form-control form-control-sm" id="foci_max"
+                   value="25" min="1" step="1">
+          </div>
+        </div>
+        <div class="row g-2 align-items-center mb-2">
+          <div class="col param-label">
+            Max dwell time (min)
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Upper limit of dwell-time bins and violin y-axis in minutes."></i>
+          </div>
+          <div class="col-5">
+            <input type="number" class="form-control form-control-sm" id="max_bin"
+                   value="300" min="10" step="10">
+          </div>
+        </div>
+        <div class="row g-2 align-items-center">
+          <div class="col param-label">
+            Max histogram %
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Upper y-axis limit for the dwell-time histogram in percent."></i>
+          </div>
+          <div class="col-5">
+            <input type="number" class="form-control form-control-sm" id="percent_max"
+                   value="13" min="1" step="1">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Options ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-gear text-primary"></i> Options
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label param-label">
+            Track filter
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="'no filter': include all tracks. 'exclude partial': exclude tracks that start at the first or end at the last frame of the nucleus. 'pass t0': like exclude partial, but keep tracks that start at the very first movie frame."></i>
+          </label>
+          <select id="track_filter" class="form-select form-select-sm">
+            <option value="no filter" selected>No filter</option>
+            <option value="exclude partial">Exclude partial</option>
+            <option value="pass t0">Pass t0</option>
+          </select>
+        </div>
+        <div class="row g-2 align-items-center">
+          <div class="col param-label">
+            Permutation resamples
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Number of resamples for the permutation test. Higher values give more accurate p-values but take longer."></i>
+          </div>
+          <div class="col-5">
+            <input type="number" class="form-control form-control-sm" id="n_resamples"
+                   value="5000" min="100" step="1000">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Actions ── -->
+    <div class="card">
+      <div class="card-body d-grid gap-2">
+        <button id="generateBtn" class="btn btn-primary" onclick="generatePlots()" disabled>
+          <span id="generateSpinner" class="spinner-border spinner-border-sm me-2"
+                style="display:none" role="status"></span>
+          <i class="bi bi-graph-up me-1"></i>Generate plots
+        </button>
+        <button id="statsBtn" class="btn btn-outline-primary" onclick="runStats()" disabled>
+          <span id="statsSpinner" class="spinner-border spinner-border-sm me-2"
+                style="display:none" role="status"></span>
+          <i class="bi bi-calculator me-1"></i>Run statistical tests
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /left column -->
+
+
+  <!-- ════════════════════════════════════════════════════════
+       RIGHT COLUMN – conditions + results
+       ════════════════════════════════════════════════════════ -->
+  <div class="col-xl-8 col-lg-7">
+
+    <!-- ── Conditions ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-list-check text-primary"></i> Conditions
+        <span class="text-muted small ms-1">— discovered sub-folders, one per condition</span>
+      </div>
+      <div class="card-body p-0">
+        <div id="conditionsPanel">
+          <p class="text-muted small m-3">
+            <i class="bi bi-arrow-left me-1"></i>Click <strong>Discover conditions</strong> to find condition folders.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Plots ── -->
+    <div id="plotsCard" class="card mb-3" style="display:none">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-bar-chart-line text-primary"></i> Plots
+      </div>
+      <div class="card-body">
+        <div class="d-flex flex-column gap-3">
+          <div>
+            <p class="param-label mb-1">Active tracks per cell over time</p>
+            <img id="imgAT" class="plot-img" src="" alt="">
+          </div>
+          <div>
+            <p class="param-label mb-1">Dwell-time histogram</p>
+            <img id="imgHist" class="plot-img" src="" alt="">
+          </div>
+          <div>
+            <p class="param-label mb-1">Dwell-time distribution (violin)</p>
+            <img id="imgViolin" class="plot-img" src="" alt="">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Statistics ── -->
+    <div id="statsCard" class="card" style="display:none">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-calculator text-primary"></i> Statistical tests
+        <span class="text-muted small ms-1">(permutation test · bootstrap CI · Mann-Whitney U)</span>
+      </div>
+      <div class="card-body">
+        <pre id="statsText" class="stats-box mb-0"></pre>
+      </div>
+    </div>
+
+  </div><!-- /right column -->
+
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+    new bootstrap.Tooltip(el);
+  });
+
+  const TAB10 = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd',
+                 '#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf'];
+
+  let discoveredConditions = [];
+
+  // ── discover ─────────────────────────────────────────────────────────────
+  async function discoverConditions() {
+    const info = document.getElementById('discoverInfo');
+    info.textContent = 'Searching…';
+    document.getElementById('generateBtn').disabled = true;
+    document.getElementById('statsBtn').disabled = true;
+
+    const resp = await fetch('/api/discover_conditions', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({data_path: document.getElementById('dataPath').value}),
+    });
+    const data = await resp.json();
+
+    if (!data.success) {
+      info.innerHTML = `<span class="text-danger">Error: ${data.error}</span>`;
+      return;
+    }
+
+    discoveredConditions = data.conditions;
+
+    if (discoveredConditions.length === 0) {
+      info.innerHTML = '<span class="text-warning">No sub-folders found.</span>';
+      renderConditions([]);
+      return;
+    }
+
+    info.innerHTML = `<span class="text-success"><i class="bi bi-check2 me-1"></i>` +
+                     `Found <strong>${discoveredConditions.length}</strong> condition(s).</span>`;
+    renderConditions(discoveredConditions);
+    document.getElementById('generateBtn').disabled = false;
+  }
+
+  // ── render conditions table ───────────────────────────────────────────────
+  function renderConditions(conds) {
+    const panel = document.getElementById('conditionsPanel');
+    if (conds.length === 0) {
+      panel.innerHTML = '<p class="text-muted small m-3">No conditions found.</p>';
+      return;
+    }
+
+    const LINESTYLES = ['solid','dashed','dotted','dashdot'];
+
+    let html = `
+      <div class="table-responsive">
+      <table class="table table-sm cond-table mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width:32px"></th>
+            <th>Folder</th>
+            <th>Display name</th>
+            <th>Color</th>
+            <th>Line</th>
+            <th>Filled</th>
+            <th title="Hatch pattern for violin/histogram (e.g. ooo, xxx, ....)">Hatch</th>
+            <th>Alpha</th>
+          </tr>
+        </thead>
+        <tbody id="condTbody">`;
+
+    conds.forEach((c, i) => {
+      const lsOpts = LINESTYLES.map(ls =>
+        `<option value="${ls}" ${ls === 'solid' ? 'selected' : ''}>${ls}</option>`).join('');
+      html += `
+        <tr data-tag="${escapeHtml(c.tag)}">
+          <td><input class="form-check-input" type="checkbox" checked></td>
+          <td class="text-muted">${escapeHtml(c.tag)}</td>
+          <td><input type="text" class="form-control form-control-sm" value="${escapeHtml(c.name)}" style="min-width:110px"></td>
+          <td><input type="color" class="cond-color form-control" value="${c.color}"></td>
+          <td><select class="form-select form-select-sm" style="min-width:90px">${lsOpts}</select></td>
+          <td class="text-center"><input class="form-check-input" type="checkbox"></td>
+          <td><input type="text" class="form-control form-control-sm cond-hatch" value="" placeholder="ooo"></td>
+          <td>
+            <div class="d-flex align-items-center gap-1">
+              <input type="range" class="form-range" min="0.1" max="1" step="0.05" value="0.8"
+                     style="width:60px"
+                     oninput="this.nextElementSibling.textContent=parseFloat(this.value).toFixed(2)">
+              <span style="font-size:0.75rem;min-width:2.5rem">0.80</span>
+            </div>
+          </td>
+        </tr>`;
+    });
+
+    html += '</tbody></table></div>';
+    panel.innerHTML = html;
+  }
+
+  // ── collect conditions from table ─────────────────────────────────────────
+  function collectConditions() {
+    const rows = document.querySelectorAll('#condTbody tr');
+    const result = [];
+    rows.forEach(row => {
+      const cells = row.querySelectorAll('td');
+      const enabled = cells[0].querySelector('input[type=checkbox]').checked;
+      if (!enabled) return;
+      result.push({
+        tag:       row.dataset.tag,
+        name:      cells[2].querySelector('input').value.trim() || row.dataset.tag,
+        color:     cells[3].querySelector('input').value,
+        linestyle: cells[4].querySelector('select').value,
+        fill:      cells[5].querySelector('input').checked,
+        hatch:     cells[6].querySelector('input').value.trim(),
+        alpha:     parseFloat(cells[7].querySelector('input[type=range]').value),
+      });
+    });
+    return result;
+  }
+
+  // ── generate plots ────────────────────────────────────────────────────────
+  async function generatePlots() {
+    const btn     = document.getElementById('generateBtn');
+    const spinner = document.getElementById('generateSpinner');
+
+    const conditions = collectConditions();
+    if (conditions.length === 0) {
+      alert('Please enable at least one condition.');
+      return;
+    }
+
+    btn.disabled = true;
+    spinner.style.display = 'inline-block';
+
+    // hide previous results
+    document.getElementById('plotsCard').style.display  = 'none';
+    document.getElementById('statsCard').style.display  = 'none';
+
+    try {
+      const resp = await fetch('/api/generate_plots', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          data_path:            document.getElementById('dataPath').value,
+          conditions:           conditions,
+          num_frames:           parseInt(document.getElementById('num_frames').value),
+          dt:                   parseFloat(document.getElementById('dt').value),
+          time_offset:          parseFloat(document.getElementById('time_offset').value),
+          remove_final_frames:  parseInt(document.getElementById('remove_final_frames').value),
+          foci_max:             parseFloat(document.getElementById('foci_max').value),
+          max_bin:              parseInt(document.getElementById('max_bin').value),
+          percent_max:          parseFloat(document.getElementById('percent_max').value),
+          track_filter:         document.getElementById('track_filter').value,
+          n_resamples:          parseInt(document.getElementById('n_resamples').value),
+        }),
+      });
+      const data = await resp.json();
+
+      if (!data.success) {
+        alert('Error: ' + data.error);
+        return;
+      }
+
+      // show plots
+      document.getElementById('imgAT').src     = 'data:image/png;base64,' + data.png_at;
+      document.getElementById('imgHist').src   = 'data:image/png;base64,' + data.png_hist;
+      document.getElementById('imgViolin').src = 'data:image/png;base64,' + data.png_violin;
+      document.getElementById('plotsCard').style.display = '';
+
+      // enable stats button now that plots are ready
+      document.getElementById('statsBtn').disabled = false;
+
+      // warn about skipped
+      if (data.skipped && data.skipped.length > 0) {
+        const info = document.getElementById('discoverInfo');
+        info.innerHTML += ` <span class="text-warning">No data found for: ${data.skipped.join(', ')}</span>`;
+      }
+
+    } catch (e) {
+      alert('Request failed: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      spinner.style.display = 'none';
+    }
+  }
+
+  // ── statistical tests ────────────────────────────────────────────────────
+  async function runStats() {
+    const btn     = document.getElementById('statsBtn');
+    const spinner = document.getElementById('statsSpinner');
+
+    btn.disabled = true;
+    spinner.style.display = 'inline-block';
+
+    try {
+      const resp = await fetch('/api/run_stats', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          data_path:    document.getElementById('dataPath').value,
+          conditions:   collectConditions(),
+          num_frames:   parseInt(document.getElementById('num_frames').value),
+          dt:           parseFloat(document.getElementById('dt').value),
+          track_filter: document.getElementById('track_filter').value,
+          n_resamples:  parseInt(document.getElementById('n_resamples').value),
+        }),
+      });
+      const data = await resp.json();
+
+      if (!data.success) {
+        alert('Error: ' + data.error);
+        return;
+      }
+
+      document.getElementById('statsText').textContent = data.stats_text;
+      document.getElementById('statsCard').style.display = '';
+      document.getElementById('statsCard').scrollIntoView({behavior: 'smooth', block: 'nearest'});
+
+    } catch (e) {
+      alert('Request failed: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      spinner.style.display = 'none';
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+{% endblock %}

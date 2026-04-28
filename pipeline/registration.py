@@ -79,7 +79,7 @@ def run_registration(path_list, method, preprocess_function=None, save_name='reg
 
         # save the registered stack
         save_path = save_dir / tifname
-        skimage.io.imsave(save_path, registered_stack)
+        skimage.io.imsave(save_path, registered_stack, check_contrast=False)
 
     
 #####

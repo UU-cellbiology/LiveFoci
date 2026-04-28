@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Pipeline – Home{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <h4 class="fw-bold">Analysis Pipeline</h4>
+  <p class="text-muted">Follow the steps in order to process your live-cell imaging data.</p>
+</div>
+
+<div class="row g-3">
+  {% set steps = [
+    ('1', 'Nuclei Segmentation',
+     'Detect and segment nuclei in every frame using Cellpose-SAM or Cellpose V3.',
+     '/step1', False),
+    ('2', 'Nuclei Tracking',
+     'Link segmented nuclei across frames to build cell tracks.',
+     '/step2', False),
+    ('3', 'Cell Cropping',
+     'Crop out individual tracked nuclei into separate image stacks.',
+     '/step3', False),
+    ('4', 'Registration',
+     'Correct for translational drift in each cropped cell stack.',
+     '/step4', False),
+    ('5', 'Foci Detection',
+     'Detect DNA-damage foci in the registered stacks.',
+     '/step5', False),
+    ('6', 'Foci Tracking',
+     'Track individual foci over time to quantify repair kinetics.',
+     '/step6', False),
+    ('7', 'Plot results',
+     'Load tracking results and generate plots of active tracks, dwell-time distributions, and run statistical tests.',
+     '/step7', False),
+  ] %}
+
+  {% for num, title, desc, href, disabled in steps %}
+  <div class="col-md-4">
+    <div class="card h-100 {% if disabled %}opacity-50{% endif %}">
+      <div class="card-body">
+        <div class="mb-3">
+          <span class="badge bg-primary">Step {{ num }}</span>
+        </div>
+        <h6 class="card-title fw-bold">{{ title }}</h6>
+        <p class="card-text text-muted small">{{ desc }}</p>
+      </div>
+      <div class="card-footer bg-transparent">
+        {% if disabled %}
+          <span class="text-muted small"><i class="bi bi-lock me-1"></i>Complete previous steps first</span>
+        {% else %}
+          <a href="{{ href }}" class="btn btn-sm btn-primary">
+            <i class="bi bi-play-fill me-1"></i>Start
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

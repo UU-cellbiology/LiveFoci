@@ -28,7 +28,7 @@ def run_foci_tracker(path_list, method, **kwargs):
     optinal parameters:
     max_distance: the maximum allowed distance for linking detections [pixels]
     gap_close: number of frames to close between tracks when detections are missing
-    min_length: the minimum allowed length of the tracks in the number of frames
+    min_length: the minimum allowed length of the tracks defined as minimum number of detections
     use_segmentation: for Trackastra only, True for using the segmented objects to calculate features 
                         and False for using detected coordinates only
     """
@@ -302,14 +302,28 @@ class GNN_tracker(object):
         return new_tracks, merged_any
 
     
+    @staticmethod
+    def load_detection_file(det_path):
+
+        if det_path.stat().st_size == 0: # catch a case with no detections  
+            return np.empty((0, 4))
+        
+        detections = np.loadtxt(det_path)
+            
+        if detections.ndim == 1:  # rehsape to 2d array when we have only 1 detection
+            detections = detections[None, :]
+
+        return detections
+
+    
     def track(self, tif_path):
         
         dir_path = Path(tif_path).parent
         detection_path = dir_path / "detected_foci.txt"  # get the path for the detections.txt
 
         num_frames = imread(tif_path).shape[0]  
-        detections = np.loadtxt(detection_path)
-
+        detections = self.load_detection_file(detection_path) 
+                  
         # initial tracks formed by only looking at the next frame
         tracks = self.build_links(detections, num_frames)
         
@@ -318,7 +332,7 @@ class GNN_tracker(object):
         
         # filter out short tracks 
         if self.min_length > 1:
-            tracks = [trk for trk in tracks if len(trk) > self.min_length]
+            tracks = [trk for trk in tracks if len(trk) >= self.min_length]
         
         # save the tracks to an xml file
         out_xml =  dir_path / "tracks.xml"
@@ -363,6 +377,7 @@ class NGMA_track(object):
         
     def forward(self, tif_file):
 
+        tif_file = Path(tif_file).resolve()   # turn path into global path
         dir_path = Path(tif_file).parent
 
         num_frames = imread(tif_file).shape[0]
@@ -528,7 +543,7 @@ class trackastra_tracker(object):
 
         # filter out short tracks
         if self.min_length > 1:
-            tracks = [trk for trk in tracks if len(trk) > self.min_length]
+            tracks = [trk for trk in tracks if len(trk) >= self.min_length]
 
         # save the resulting tracks
         out_xml =  dir_path / "tracks.xml"

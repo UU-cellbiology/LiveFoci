@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+
+{% block title %}Step 4 – Registration{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <span class="badge bg-primary fs-6 me-3">Step 4</span>
+  <h4 class="fw-bold mb-0">Registration</h4>
+</div>
+
+<div class="row g-4">
+
+  <!-- ════════════════════════════════════════════════════════
+       LEFT COLUMN  (settings)
+       ════════════════════════════════════════════════════════ -->
+  <div class="col-xl-4 col-lg-5">
+
+    <!-- ── Data ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-folder2-open text-primary"></i> Data
+      </div>
+      <div class="card-body">
+        <div class="mb-2">
+          <label class="form-label param-label">Data folder</label>
+          <input id="dataPath" type="text" class="form-control form-control-sm"
+                 value="{{ default_data_path }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label param-label">
+            Glob pattern
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Pattern to find cropped cell stacks produced by Step 3. Each match is a .tif file inside a followed/ sub-folder."></i>
+          </label>
+          <input id="pattern" type="text" class="form-control form-control-sm"
+                 value="*/Pos*/results/followed/*/*.tif">
+        </div>
+        <button class="btn btn-sm btn-outline-primary w-100" onclick="discoverPaths()">
+          <i class="bi bi-search me-1"></i>Discover cell stacks
+        </button>
+        <div id="pathsInfo" class="mt-2 text-muted small"></div>
+      </div>
+    </div>
+
+    <!-- ── Parameters ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-sliders text-primary"></i> Parameters
+      </div>
+      <div class="card-body">
+
+        <!-- method -->
+        <div class="mb-3">
+          <label class="form-label param-label">
+            Registration method
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="StackReg or Elastix"></i>
+          </label>
+          <select id="method" class="form-select form-select-sm" onchange="onMethodChange()">
+            <option value="stackreg" selected>StackReg</option>
+            <option value="elastix">Elastix</option>
+          </select>
+        </div>
+
+        <!-- preprocessing -->
+        <div class="mb-3">
+          <label class="form-label param-label">
+            Preprocessing
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Optional preprocessing applied to the stack before computing the registration transform. The transform is then applied to the original (unprocessed) stack."></i>
+          </label>
+          <select id="preproc" class="form-select form-select-sm">
+            <option value="None" selected>None (use raw stack)</option>
+            <option value="wavelet_denoise">Wavelet denoise</option>
+            <option value="threshold">Threshold</option>
+            <option value="DOG_filter">Difference of Gaussians</option>
+          </select>
+        </div>
+
+        <!-- elastix loss (only for elastix) -->
+        <div id="elastixOptions" style="display:none">
+          <div class="mb-0">
+            <label class="form-label param-label">
+              Elastix similarity metric
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="MSE (Mean Squared Error) works well when intensities are comparable. MI (Mutual Information) is more robust to intensity differences. NCC (Normalised Cross-Correlation) is intensity-invariant."></i>
+            </label>
+            <select id="loss" class="form-select form-select-sm">
+              <option value="MSE" selected>MSE – Mean Squared Error</option>
+              <option value="MI">MI – Mutual Information</option>
+              <option value="NCC">NCC – Normalised Cross-Correlation</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Output note ── -->
+
+
+    <!-- ── Actions ── -->
+    <div class="card">
+      <div class="card-body">
+        <div class="d-grid gap-2">
+          <button id="previewBtn" class="btn btn-outline-primary" onclick="runPreview()" disabled>
+            <span id="previewSpinner" class="spinner-border spinner-border-sm me-2"
+                  style="display:none" role="status"></span>
+            <i class="bi bi-eye me-1"></i>Preview (random cell)
+          </button>
+          <button id="runBtn" class="btn btn-primary" onclick="runAll()" disabled>
+            <i class="bi bi-play-fill me-1"></i>Run registration on all data
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="yamlBadge" class="text-success small mt-1" style="display:none">
+      <i class="bi bi-check2-circle me-1"></i>Parameters saved to parameters.yml
+    </div>
+
+  </div><!-- /left column -->
+
+
+  <!-- ════════════════════════════════════════════════════════
+       RIGHT COLUMN  (results)
+       ════════════════════════════════════════════════════════ -->
+  <div class="col-xl-8 col-lg-7">
+
+    <!-- Preview panel -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-grid text-primary"></i> Preview — before / after registration
+      </div>
+      <div class="card-body" id="previewResults">
+        <p class="text-muted small mb-0">
+          <i class="bi bi-arrow-left me-1"></i>
+          Click <strong>Preview</strong> to register one cell stack and inspect the result.
+          The first six frames are shown; top row = input, bottom row = registered.
+        </p>
+      </div>
+    </div>
+
+    <!-- Progress panel -->
+    <div class="card" id="progressCard" style="display:none">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-bar-chart-steps text-primary"></i> Run progress
+      </div>
+      <div class="card-body">
+        <div class="progress mb-3" style="height: 22px;">
+          <div id="progressBar"
+               class="progress-bar progress-bar-striped progress-bar-animated"
+               role="progressbar" style="width: 0%">0 / 0</div>
+        </div>
+        <div id="progressLog" class="log-box"></div>
+      </div>
+    </div>
+
+  </div><!-- /right column -->
+
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+    new bootstrap.Tooltip(el);
+  });
+
+  let discoveredPaths = [];
+  let currentTaskId   = null;
+  let pollingTimer    = null;
+
+  function onMethodChange() {
+    const isElastix = document.getElementById('method').value === 'elastix';
+    document.getElementById('elastixOptions').style.display = isElastix ? '' : 'none';
+  }
+
+  function setActionButtons(enabled) {
+    document.getElementById('previewBtn').disabled = !enabled;
+    document.getElementById('runBtn').disabled     = !enabled;
+  }
+
+  // ── discover ───────────────────────────────────────────────────────────────
+  async function discoverPaths() {
+    const info = document.getElementById('pathsInfo');
+    info.textContent = 'Searching…';
+    setActionButtons(false);
+
+    const resp = await fetch('/api/discover_paths', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        data_path: document.getElementById('dataPath').value,
+        pattern:   document.getElementById('pattern').value,
+      }),
+    });
+    const data = await resp.json();
+
+    if (data.success) {
+      discoveredPaths = data.paths;
+      if (data.count === 0) {
+        info.innerHTML = '<span class="text-warning">No cell stacks found – check path &amp; pattern.</span>';
+      } else {
+        info.innerHTML =
+          `<span class="text-success"><i class="bi bi-check2 me-1"></i>` +
+          `Found <strong>${data.count}</strong> cell stack(s).</span>`;
+        setActionButtons(true);
+      }
+    } else {
+      info.innerHTML = `<span class="text-danger">Error: ${data.error}</span>`;
+    }
+  }
+
+  function getParams() {
+    return {
+      data_path:     document.getElementById('dataPath').value,
+      followed_tifs: discoveredPaths,
+      method:        document.getElementById('method').value,
+      preproc:       document.getElementById('preproc').value,
+      loss:          document.getElementById('loss').value,
+    };
+  }
+
+  // ── preview ────────────────────────────────────────────────────────────────
+  async function runPreview() {
+    const btn     = document.getElementById('previewBtn');
+    const spinner = document.getElementById('previewSpinner');
+    const panel   = document.getElementById('previewResults');
+
+    btn.disabled = true;
+    spinner.style.display = 'inline-block';
+    panel.innerHTML =
+      '<p class="text-muted small"><i class="bi bi-hourglass-split me-1"></i>' +
+      'Registering cell stack – please wait…</p>';
+
+    try {
+      const resp = await fetch('/api/preview_registration', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(getParams()),
+      });
+      const data = await resp.json();
+
+      if (data.success) {
+        renderPreview(data);
+      } else {
+        panel.innerHTML =
+          `<div class="alert alert-danger mb-0"><strong>Error:</strong> ${data.error}</div>`;
+      }
+    } catch (e) {
+      panel.innerHTML =
+        `<div class="alert alert-danger mb-0">Request failed: ${e.message}</div>`;
+    } finally {
+      btn.disabled = false;
+      spinner.style.display = 'none';
+    }
+  }
+
+  function renderPreview(data) {
+    const panel = document.getElementById('previewResults');
+
+    let html =
+      `<p class="text-muted small mb-2">
+         <i class="bi bi-file-earmark me-1"></i>
+         <code>${data.selected_path}</code>
+         &nbsp;&mdash;&nbsp;${data.n_frames} frames total
+       </p>`;
+
+    // Two-row table: before / after
+    html += `<div class="table-responsive">
+      <table class="table table-borderless preview-table mb-0">
+        <tbody>`;
+
+    // before row
+    html += `<tr><td class="row-label">Before</td>`;
+    data.input.forEach((b64, i) => {
+      html += `<td style="padding:2px">
+        <img src="data:image/png;base64,${b64}"
+             class="preview-img" style="max-width:200px; background:#000;"
+             title="Frame ${data.frames[i]}">
+      </td>`;
+    });
+    html += `</tr>`;
+
+    // after row
+    html += `<tr><td class="row-label">After</td>`;
+    data.registered.forEach((b64, i) => {
+      html += `<td style="padding:2px">
+        <img src="data:image/png;base64,${b64}"
+             class="preview-img" style="max-width:200px; background:#000;"
+             title="Frame ${data.frames[i]}">
+      </td>`;
+    });
+    html += `</tr>`;
+
+    // frame-number row
+    html += `<tr><td></td>`;
+    data.frames.forEach(f => {
+      html += `<td class="text-center" style="font-size:0.72rem; color:#6c757d; padding:1px 2px">t=${f}</td>`;
+    });
+    html += `</tr>`;
+
+    html += `</tbody></table></div>`;
+    panel.innerHTML = html;
+  }
+
+  // ── run all ────────────────────────────────────────────────────────────────
+  async function runAll() {
+    const runBtn       = document.getElementById('runBtn');
+    const progressCard = document.getElementById('progressCard');
+    const bar          = document.getElementById('progressBar');
+    const log          = document.getElementById('progressLog');
+
+    runBtn.disabled = true;
+    progressCard.style.display = '';
+    bar.style.width = '0%';
+    bar.textContent = '0 / 0';
+    bar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+    log.innerHTML = '';
+
+    try {
+      const resp = await fetch('/api/run_registration', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(getParams()),
+      });
+      const data = await resp.json();
+
+      if (!data.success) {
+        appendLog(log, data.error, 'log-err');
+        runBtn.disabled = false;
+        return;
+      }
+
+      currentTaskId = data.task_id;
+      if (data.yaml_saved) document.getElementById('yamlBadge').style.display = '';
+      startPolling();
+    } catch (e) {
+      appendLog(log, `Request failed: ${e.message}`, 'log-err');
+      runBtn.disabled = false;
+    }
+  }
+
+  function startPolling() {
+    if (pollingTimer) clearInterval(pollingTimer);
+    pollingTimer = setInterval(pollProgress, 1200);
+  }
+
+  async function pollProgress() {
+    try {
+      const resp = await fetch(`/api/progress/${currentTaskId}`);
+      const data = await resp.json();
+      if (!data.success) return;
+
+      const bar = document.getElementById('progressBar');
+      const log = document.getElementById('progressLog');
+
+      const pct = data.total > 0 ? Math.round(data.progress / data.total * 100) : 0;
+      bar.style.width  = pct + '%';
+      bar.textContent  = `${data.progress} / ${data.total}`;
+
+      log.innerHTML = data.log.map(line => {
+        const cls = line.startsWith('ERROR')   ? 'log-err'
+                  : line.includes('saved')
+                    || line === 'All done!'    ? 'log-ok'
+                  : line.includes('skipped')   ? 'log-skip'
+                  : '';
+        return `<span class="${cls}">${escapeHtml(line)}</span>`;
+      }).join('\n');
+      log.scrollTop = log.scrollHeight;
+
+      if (data.status === 'done') {
+        clearInterval(pollingTimer);
+        bar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+        bar.classList.add('bg-success');
+        document.getElementById('runBtn').disabled = false;
+      } else if (data.status === 'error') {
+        clearInterval(pollingTimer);
+        bar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+        bar.classList.add('bg-danger');
+        document.getElementById('runBtn').disabled = false;
+      }
+    } catch (_) { /* network blip */ }
+  }
+
+  function appendLog(el, text, cls) {
+    el.innerHTML += `<span class="${cls || ''}">${escapeHtml(text)}</span>\n`;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+{% endblock %}

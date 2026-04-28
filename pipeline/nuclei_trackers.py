@@ -31,8 +31,8 @@ def run_tracker(path_list, method, min_length=20, **kwargs):
 
     optinal parameters:    
     iou_min: IOU tracker only, the minimum overlap required before considering it to be linked
-    gap_closing: NDD tracker only, number of frames to close between tracks when detections are missing
-    max_distance: NDD tracker only, the maximum allowed distance for linking detections [pixels]
+    gap_closing: NND tracker only, number of frames to close between tracks when detections are missing
+    max_distance: NND tracker only, the maximum allowed distance for linking detections [pixels]
     remove_gaps: for Trackastra only, when True splits tracks into separate gaps whenever there is 
         a missing detections
     """
@@ -41,11 +41,11 @@ def run_tracker(path_list, method, min_length=20, **kwargs):
         iou_min = kwargs.pop("iou_min", 0.01)
         
         tracker = IOU_tracker(min_track_length=min_length, iou_min=iou_min)
-    elif method=='NDD':
+    elif method=='NND':
         max_dist = kwargs.pop("max_distance", 30.0)
         gap_close = kwargs.pop("gap_closing", 0)
-        
-        tracker = NDD_tracker(min_track_length=min_length, max_distance=max_dist, gap_closing=gap_close)
+
+        tracker = NND_tracker(min_track_length=min_length, max_distance=max_dist, gap_closing=gap_close)
     elif method=='trackastra':
         remove_gaps = kwargs.pop("remove_gaps", True)
 
@@ -252,7 +252,7 @@ class IOU_tracker(object):
         np.savetxt(str(track_file), self.track_info_to_array(tracking_info), fmt="%d")
 
 
-class NDD_tracker(object):
+class NND_tracker(object):
     
     def __init__(self, min_track_length, max_distance, gap_closing=0, motion_model=0):
         super().__init__() 
@@ -263,14 +263,14 @@ class NDD_tracker(object):
         self.base_dir =  Path(__file__).parent.resolve()  #Path.cwd()  #
 
         if os.name == "nt":  # command for windows
-            self.java = self.base_dir / "NDD_utils" / "ImageJ" / "jre" / "bin" / "java.exe"
+            self.java = self.base_dir / "NND_utils" / "ImageJ" / "jre" / "bin" / "java.exe"
             self.classpath_sep = ";"
         else:  # command for other systems
-            self.java = self.base_dir / "NDD_utils" / "ImageJ" / "jre" / "bin" / "java"
+            self.java = self.base_dir / "NND_utils" / "ImageJ" / "jre" / "bin" / "java"
             self.classpath_sep = ":"
                             
         # location of the java tracking plugin
-        self.TP_dir = self.base_dir / "NDD_utils" / "SOSTracker commandline"
+        self.TP_dir = self.base_dir / "NND_utils" / "SOSTracker commandline"
 
         # Classpath jars
         jars = ["VENI_.jar", "ij.jar", "imagescience.jar", "Jama-1.0.2.jar"]
@@ -312,8 +312,8 @@ class NDD_tracker(object):
         cmd = [str(self.java), *self.plugins, *args]
 
         p = subprocess.run(cmd, capture_output=True, text=True, cwd=self.TP_dir)
-        print(p.stderr)
-        print(p.stdout)        
+        #print(p.stderr)
+        #print(p.stdout)        
         
         # save the results to the format of the cell tracking challange
         self.save_to_ctc_format(save_path, temp_path, seg_sequence)

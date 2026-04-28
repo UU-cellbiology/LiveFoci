@@ -1,0 +1,54 @@
+step1_segmentation:
+  segmentation:
+    method: cellpose_sam
+    flow_threshold: 0.0
+    cellprob_threshold: -0.5
+    min_area: 1000
+    cellpose_sam:
+      scale_factor: 0.5
+    cellpose_v3:
+      diameter: 140
+  preprocessing:
+    method: null
+    wavelet_filtering:
+      scales: 5
+      w_factor: 1.5
+      start_scale: 2
+    contrast_adjuster:
+      sigma: 3.0
+      c_factor: 6.0
+step2_tracking:
+  method: NND
+  min_length: 36
+  NND:
+    max_distance: 30.0
+    gap_closing: 0
+  IOU:
+    iou_min: 0.01
+  trackastra:
+    remove_gaps: true
+step3_cropping:
+  margin: 30
+step4_registration:
+  method: stackreg
+  preprocessing: null
+  elastix:
+    loss: MSE
+step5_detection:
+  method: TopHat
+  threshold: 36
+  return_segmentation: true
+  params:
+    sigma: 0.6
+    radius: 6.0
+step6_tracking:
+  method: GNN
+  min_track_length: 3
+  GNN:
+    max_distance: 5.0
+    gap_closing: 2
+  NGMA:
+    max_distance: 5.0
+    gap_closing: 2
+  trackastra:
+    use_segmentation: true

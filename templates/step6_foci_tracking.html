@@ -1,0 +1,394 @@
+{% extends "base.html" %}
+
+{% block title %}Step 6 – Foci Tracking{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <span class="badge bg-primary fs-6 me-3">Step 6</span>
+  <h4 class="fw-bold mb-0">Foci Tracking</h4>
+</div>
+
+<div class="row g-4">
+
+  <!-- ════════════════════════════════════════════════════════
+       LEFT COLUMN
+       ════════════════════════════════════════════════════════ -->
+  <div class="col-xl-4 col-lg-5">
+
+    <!-- ── Data ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-folder2-open text-primary"></i> Data
+      </div>
+      <div class="card-body">
+        <div class="mb-2">
+          <label class="form-label param-label">Data folder</label>
+          <input id="dataPath" type="text" class="form-control form-control-sm"
+                 value="{{ default_data_path }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label param-label">
+            Glob pattern
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Pattern to find registered cell stacks. Each stack must already have a detected_foci.txt produced by Step 5."></i>
+          </label>
+          <input id="pattern" type="text" class="form-control form-control-sm"
+                 value="*/Pos*/results/registered/*/*.tif">
+        </div>
+        <button class="btn btn-sm btn-outline-primary w-100" onclick="discoverPaths()">
+          <i class="bi bi-search me-1"></i>Discover cell stacks
+        </button>
+        <div id="pathsInfo" class="mt-2 text-muted small"></div>
+      </div>
+    </div>
+
+    <!-- ── Parameters ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-sliders text-primary"></i> Parameters
+      </div>
+      <div class="card-body">
+
+        <div class="mb-3">
+          <label class="form-label param-label">
+            Tracking method
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Select which tracking algorithm to use"></i>
+          </label>
+          <select id="tracking_method" class="form-select form-select-sm" onchange="onMethodChange()">
+            <option value="GNN" selected>GNN – Global Nearest Neighbour</option>
+            <option value="NGMA">NGMA</option>
+            <option value="trackastra">Trackastra (deep learning)</option>
+          </select>
+        </div>
+
+        <div class="row g-2 align-items-center mb-2">
+          <div class="col param-label">
+            Min track length
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Minimum number of detections required to keep a track."></i>
+          </div>
+          <div class="col-5">
+            <input type="range" class="form-range" id="min_track_length"
+                   min="1" max="20" step="1" value="3"
+                   oninput="showVal('min_track_length','min_len_v')">
+          </div>
+          <div class="col-auto param-value-display" id="min_len_v">3</div>
+        </div>
+
+        <!-- GNN + NGMA params -->
+        <div id="gnn_params">
+          <div class="row g-2 align-items-center mb-2">
+            <div class="col param-label">
+              Max distance (px)
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Maximum allowed distance between detections in consecutive frames to be linked."></i>
+            </div>
+            <div class="col-5">
+              <input type="range" class="form-range" id="max_distance"
+                     min="1" max="30" step="0.5" value="5"
+                     oninput="showVal('max_distance','max_dist_v')">
+            </div>
+            <div class="col-auto param-value-display" id="max_dist_v">5.0</div>
+          </div>
+          <div class="row g-2 align-items-center">
+            <div class="col param-label">
+              Gap closing
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Number of frames allowed to skip when closing gaps between track segments."></i>
+            </div>
+            <div class="col-5">
+              <input type="range" class="form-range" id="gap_closing"
+                     min="0" max="10" step="1" value="2"
+                     oninput="showVal('gap_closing','gap_v')">
+            </div>
+            <div class="col-auto param-value-display" id="gap_v">2</div>
+          </div>
+        </div>
+
+        <!-- Trackastra-only option -->
+        <div id="trackastra_params" style="display:none" class="mt-2">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="use_segmentation" checked>
+            <label class="form-check-label param-label" for="use_segmentation">
+              Use spot segmentation
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="When enabled, uses spot_segmentation.tif from Step 5. When disabled, uses detection coordinates only."></i>
+            </label>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Actions ── -->
+    <div class="card">
+      <div class="card-body">
+        <div class="d-grid gap-2">
+          <button id="previewBtn" class="btn btn-outline-primary" onclick="runPreview()" disabled>
+            <span id="previewSpinner" class="spinner-border spinner-border-sm me-2"
+                  style="display:none" role="status"></span>
+            <i class="bi bi-eye me-1"></i>Preview (random cell)
+          </button>
+          <button id="runBtn" class="btn btn-primary" onclick="runAll()" disabled>
+            <i class="bi bi-play-fill me-1"></i>Run tracking on all data
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="yamlBadge" class="text-success small mt-1" style="display:none">
+      <i class="bi bi-check2-circle me-1"></i>Parameters saved to parameters.yml
+    </div>
+
+  </div><!-- /left column -->
+
+
+  <!-- ════════════════════════════════════════════════════════
+       RIGHT COLUMN
+       ════════════════════════════════════════════════════════ -->
+  <div class="col-xl-8 col-lg-7">
+
+    <!-- Preview panel -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-film text-primary"></i> Preview — foci tracking movie
+      </div>
+      <div class="card-body" id="previewResults">
+        <p class="text-muted small mb-0">
+          <i class="bi bi-arrow-left me-1"></i>
+          Click <strong>Preview</strong> to track one cell and display the tracking movie.
+        </p>
+      </div>
+    </div>
+
+    <!-- Progress panel -->
+    <div class="card" id="progressCard" style="display:none">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-bar-chart-steps text-primary"></i> Run progress
+      </div>
+      <div class="card-body">
+        <div class="progress mb-3" style="height: 22px;">
+          <div id="progressBar"
+               class="progress-bar progress-bar-striped progress-bar-animated"
+               role="progressbar" style="width: 0%">0 / 0</div>
+        </div>
+        <div id="progressLog" class="log-box"></div>
+      </div>
+    </div>
+
+  </div><!-- /right column -->
+
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+    new bootstrap.Tooltip(el);
+  });
+
+  let discoveredPaths = [];
+  let currentTaskId   = null;
+  let pollingTimer    = null;
+
+  function showVal(sliderId, displayId) {
+    const val = parseFloat(document.getElementById(sliderId).value);
+    document.getElementById(displayId).textContent =
+      Number.isInteger(val) ? val : val.toFixed(1);
+  }
+
+  function onMethodChange() {
+    const method = document.getElementById('tracking_method').value;
+    const isTrackastra = method === 'trackastra';
+    document.getElementById('gnn_params').style.display        = isTrackastra ? 'none' : '';
+    document.getElementById('trackastra_params').style.display = isTrackastra ? ''     : 'none';
+  }
+
+  function setActionButtons(enabled) {
+    document.getElementById('previewBtn').disabled = !enabled;
+    document.getElementById('runBtn').disabled     = !enabled;
+  }
+
+  // ── discover ───────────────────────────────────────────────────────────────
+  async function discoverPaths() {
+    const info = document.getElementById('pathsInfo');
+    info.textContent = 'Searching…';
+    setActionButtons(false);
+
+    const resp = await fetch('/api/discover_paths', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        data_path: document.getElementById('dataPath').value,
+        pattern:   document.getElementById('pattern').value,
+      }),
+    });
+    const data = await resp.json();
+
+    if (data.success) {
+      discoveredPaths = data.paths;
+      if (data.count === 0) {
+        info.innerHTML = '<span class="text-warning">No stacks found – check path &amp; pattern.</span>';
+      } else {
+        info.innerHTML =
+          `<span class="text-success"><i class="bi bi-check2 me-1"></i>` +
+          `Found <strong>${data.count}</strong> cell stack(s).</span>`;
+        setActionButtons(true);
+      }
+    } else {
+      info.innerHTML = `<span class="text-danger">Error: ${data.error}</span>`;
+    }
+  }
+
+  function getParams() {
+    return {
+      data_path:         document.getElementById('dataPath').value,
+      reg_paths:         discoveredPaths,
+      tracking_method:   document.getElementById('tracking_method').value,
+      min_track_length:  parseInt(document.getElementById('min_track_length').value),
+      max_distance:      parseFloat(document.getElementById('max_distance').value),
+      gap_closing:       parseInt(document.getElementById('gap_closing').value),
+      use_segmentation:  document.getElementById('use_segmentation').checked,
+    };
+  }
+
+  // ── preview ────────────────────────────────────────────────────────────────
+  async function runPreview() {
+    const btn     = document.getElementById('previewBtn');
+    const spinner = document.getElementById('previewSpinner');
+    const panel   = document.getElementById('previewResults');
+
+    btn.disabled = true;
+    spinner.style.display = 'inline-block';
+    panel.innerHTML =
+      '<p class="text-muted small"><i class="bi bi-hourglass-split me-1"></i>' +
+      'Running foci tracking – please wait…</p>';
+
+    try {
+      const resp = await fetch('/api/preview_foci_tracking', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(getParams()),
+      });
+      const data = await resp.json();
+
+      if (data.success) {
+        renderPreview(data);
+      } else {
+        panel.innerHTML =
+          `<div class="alert alert-danger mb-0"><strong>Error:</strong> ${data.error}</div>`;
+      }
+    } catch (e) {
+      panel.innerHTML =
+        `<div class="alert alert-danger mb-0">Request failed: ${e.message}</div>`;
+    } finally {
+      btn.disabled = false;
+      spinner.style.display = 'none';
+    }
+  }
+
+  function renderPreview(data) {
+    const panel = document.getElementById('previewResults');
+    panel.innerHTML =
+      `<p class="text-muted small mb-2">
+         <i class="bi bi-file-earmark me-1"></i>
+         <code>${escapeHtml(data.selected_path)}</code>
+         &nbsp;&mdash;&nbsp;
+         <span class="badge bg-secondary">${data.n_tracks} track(s)</span>
+       </p>
+       <video width="700" controls loop style="border-radius:6px; background:#000; max-width:100%">
+         <source src="data:video/mp4;base64,${data.movie_b64}" type="video/mp4">
+         Your browser does not support HTML5 video.
+       </video>`;
+  }
+
+  // ── run all ────────────────────────────────────────────────────────────────
+  async function runAll() {
+    const runBtn       = document.getElementById('runBtn');
+    const progressCard = document.getElementById('progressCard');
+    const bar          = document.getElementById('progressBar');
+    const log          = document.getElementById('progressLog');
+
+    runBtn.disabled = true;
+    progressCard.style.display = '';
+    bar.style.width = '0%';
+    bar.textContent = '0 / 0';
+    bar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+    log.innerHTML = '';
+
+    try {
+      const resp = await fetch('/api/run_foci_tracking', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(getParams()),
+      });
+      const data = await resp.json();
+
+      if (!data.success) {
+        appendLog(log, data.error, 'log-err');
+        runBtn.disabled = false;
+        return;
+      }
+
+      currentTaskId = data.task_id;
+      if (data.yaml_saved) document.getElementById('yamlBadge').style.display = '';
+      startPolling();
+    } catch (e) {
+      appendLog(log, `Request failed: ${e.message}`, 'log-err');
+      runBtn.disabled = false;
+    }
+  }
+
+  function startPolling() {
+    if (pollingTimer) clearInterval(pollingTimer);
+    pollingTimer = setInterval(pollProgress, 1200);
+  }
+
+  async function pollProgress() {
+    try {
+      const resp = await fetch(`/api/progress/${currentTaskId}`);
+      const data = await resp.json();
+      if (!data.success) return;
+
+      const bar = document.getElementById('progressBar');
+      const log = document.getElementById('progressLog');
+
+      const pct = data.total > 0 ? Math.round(data.progress / data.total * 100) : 0;
+      bar.style.width  = pct + '%';
+      bar.textContent  = `${data.progress} / ${data.total}`;
+
+      log.innerHTML = data.log.map(line => {
+        const cls = line.startsWith('ERROR')  ? 'log-err'
+                  : line.includes('saved')
+                    || line === 'All done!'   ? 'log-ok'
+                  : '';
+        return `<span class="${cls}">${escapeHtml(line)}</span>`;
+      }).join('\n');
+      log.scrollTop = log.scrollHeight;
+
+      if (data.status === 'done') {
+        clearInterval(pollingTimer);
+        bar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+        bar.classList.add('bg-success');
+        document.getElementById('runBtn').disabled = false;
+      } else if (data.status === 'error') {
+        clearInterval(pollingTimer);
+        bar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+        bar.classList.add('bg-danger');
+        document.getElementById('runBtn').disabled = false;
+      }
+    } catch (_) { /* network blip */ }
+  }
+
+  function appendLog(el, text, cls) {
+    el.innerHTML += `<span class="${cls || ''}">${escapeHtml(text)}</span>\n`;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+{% endblock %}

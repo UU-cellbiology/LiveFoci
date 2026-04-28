@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}LIve Foci Tracking{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    /* ── pastel-green theme (overrides Bootstrap primary blue) ── */
+    :root {
+      --bs-primary: #6aab8e;
+      --bs-primary-rgb: 106, 171, 142;
+    }
+    .btn-primary {
+      --bs-btn-bg: #6aab8e;
+      --bs-btn-border-color: #6aab8e;
+      --bs-btn-hover-bg: #5a9478;
+      --bs-btn-hover-border-color: #5a9478;
+      --bs-btn-active-bg: #4e8065;
+      --bs-btn-active-border-color: #4e8065;
+      --bs-btn-disabled-bg: #6aab8e;
+      --bs-btn-disabled-border-color: #6aab8e;
+    }
+    .btn-outline-primary {
+      --bs-btn-color: #6aab8e;
+      --bs-btn-border-color: #6aab8e;
+      --bs-btn-hover-bg: #6aab8e;
+      --bs-btn-hover-border-color: #6aab8e;
+      --bs-btn-active-bg: #6aab8e;
+      --bs-btn-active-border-color: #6aab8e;
+    }
+    .bg-primary { background-color: #6aab8e !important; }
+    .text-primary { color: #6aab8e !important; }
+
+    body { background: #f8f9fa; }
+
+    /* ── top navbar ── */
+    .navbar-brand { font-weight: 700; letter-spacing: 0.03em; }
+
+    /* ── step ribbon ── */
+    .step-ribbon {
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+      background: #fff;
+      border-bottom: 1px solid #dee2e6;
+      padding: 0 1rem;
+    }
+    .step-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.25rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #6c757d;
+      text-decoration: none;
+      white-space: nowrap;
+      border-bottom: 3px solid transparent;
+      transition: color .15s, border-color .15s;
+    }
+    .step-item:hover { color: #6aab8e; text-decoration: none; }
+    .step-item.active {
+      color: #6aab8e;
+      border-bottom-color: #6aab8e;
+    }
+    .step-item.disabled {
+      pointer-events: none;
+      opacity: 0.4;
+    }
+    .step-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: #dee2e6;
+      color: #495057;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .step-item.active .step-badge { background: #6aab8e; color: #fff; }
+    .step-item.done   .step-badge { background: #198754; color: #fff; }
+
+    /* ── main content ── */
+    .main-content { padding: 2rem 2rem 4rem; max-width: 1600px; margin: 0 auto; }
+
+    /* ── cards ── */
+    .card { border: none; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    .card-header { background: #fff; border-bottom: 1px solid #f0f0f0;
+                   font-weight: 600; }
+
+    /* ── parameter rows ── */
+    .param-label { font-size: 0.82rem; color: #495057; white-space: nowrap; }
+    .param-value-display { min-width: 3.5rem; text-align: right; font-size: 0.82rem;
+                           font-variant-numeric: tabular-nums; }
+
+    /* ── preview table ── */
+    .preview-table td, .preview-table th { padding: 4px 6px; vertical-align: middle; }
+    .preview-table .row-label {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #6c757d;
+      text-align: center;
+      white-space: nowrap;
+      width: 24px;
+    }
+    .preview-img { display: block; width: 100%; max-width: 320px;
+                   border-radius: 4px; border: 1px solid #dee2e6; }
+
+    /* ── log box ── */
+    .log-box {
+      font-family: monospace;
+      font-size: 0.78rem;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      max-height: 220px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    .log-box .log-ok   { color: #4ec9b0; }
+    .log-box .log-err  { color: #f44747; }
+    .log-box .log-skip { color: #ce9178; }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<!-- navbar -->
+<nav class="navbar navbar-light bg-white border-bottom">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+      <img src="/logo.png" height="36" alt="Logo">
+      LIve Foci Tracking
+    </a>
+    <span class="text-muted small">Pipeline GUI</span>
+  </div>
+</nav>
+
+<!-- step ribbon -->
+<div class="step-ribbon">
+  {% set steps = [
+    ('1', 'Nuclei Segmentation', '/step1'),
+    ('2', 'Nuclei Tracking',     '/step2'),
+    ('3', 'Cell Cropping',       '/step3'),
+    ('4', 'Registration',        '/step4'),
+    ('5', 'Foci Detection',      '/step5'),
+    ('6', 'Foci Tracking',       '/step6'),
+    ('7', 'Plot results',        '/step7'),
+  ] %}
+  {% for num, label, href in steps %}
+    {% set is_active = (request.path == href) %}
+    {% set is_disabled = (href == '#') %}
+    <a href="{{ href }}"
+       class="step-item {% if is_active %}active{% elif is_disabled %}disabled{% endif %}">
+      <span class="step-badge">{{ num }}</span>
+      {{ label }}
+    </a>
+  {% endfor %}
+</div>
+
+<!-- page content -->
+<div class="main-content">
+  {% block content %}{% endblock %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

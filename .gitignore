@@ -3,16 +3,20 @@ pipeline/quantify*.ipynb
 pipeline/register_cells.ipynb
 pipeline/make_paper_figures.ipynb
 pipeline/foci_detectors.ipynb
-Make_MaxProj_livecell
 
 # Ignore IDE settings
+.vscode/
 .ipynb_checkpoints/
 pipeline/.ipynb_checkpoints/
-pipeline/_pycache_
+__pycache__/
+*.pyc
 
-# Ignore fils
+# Ignore data folders
 data/
-data_test_subsampling
+data_PLC_PRF/
+data_U2OS/
+data_cellcycle/
+data_test_subsampling/
 EBRT_vs_PRRT/
 Ho_Y_data/
 Inhibitor/
