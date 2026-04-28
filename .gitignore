@@ -3,6 +3,7 @@ pipeline/quantify*.ipynb
 pipeline/register_cells.ipynb
 pipeline/make_paper_figures.ipynb
 pipeline/foci_detectors.ipynb
+tracking/
 
 # Ignore IDE settings
 .vscode/
@@ -13,13 +14,5 @@ __pycache__/
 
 # Ignore data folders
 data/
-data_PLC_PRF/
-data_U2OS/
-data_cellcycle/
-data_test_subsampling/
-EBRT_vs_PRRT/
-Ho_Y_data/
-Inhibitor/
+data*/
 paper/
-tracking/
-
