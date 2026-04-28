@@ -24,7 +24,6 @@ The pipeline runs in seven sequential steps:
 | 4 | **Registration** | Correct for translational and rotation within each cropped cell stack |
 | 5 | **Foci detection** | Detect DNA-damage foci in the registered stacks |
 | 6 | **Foci tracking** | Track individual foci over time to quantify repair kinetics |
-| 7 | **Plot results** | Generate plots of active tracks, dwell-time distributions, and run statistical tests |
 
 ---
 
@@ -38,7 +37,7 @@ A browser-based interface. Each step has a dedicated page where you can tune par
 python LiFT_app.py
 ```
 
-Then open [http://localhost:5000](http://localhost:5000) in your browser. Work through steps 1–7 in order. When you click **Run all** for any step, the current parameters are automatically saved to `parameters.yml` inside your data folder.
+Then open [http://localhost:5000](http://localhost:5000) in your browser. Work through steps 1–6 in order. When you click **Run all** for any step, the current parameters are automatically saved to `parameters.yml` inside your data folder.
 
 ---
 
