@@ -86,7 +86,7 @@ def run(data_path: str, steps: list = None):
         method       = s['method']
         preproc_func = _make_preproc(s.get('preprocessing'))
         kwargs       = s.get('elastix', {}) if method == 'elastix' else {}
-        followed = sorted(data_path.glob("*/*/Pos*/results/followed/*/*.tif"))
+        followed = sorted(data_path.glob("*/*/Pos*/results/followed/*/I_*.tif"))
         registration.run_registration(followed, method=method, preprocess_function=preproc_func, **kwargs)
 
 

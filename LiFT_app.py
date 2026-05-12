@@ -86,7 +86,7 @@ def step1():
 def discover_paths():
     data = request.get_json()
     data_path = data.get('data_path', DEFAULT_DATA_PATH)
-    pattern   = data.get('pattern', '*/Pos*/raw')
+    pattern   = data.get('pattern', '*/*/Pos*/raw')
     try:
         raw_paths = sorted(Path(data_path).glob(pattern))
         return jsonify({
@@ -294,7 +294,7 @@ def preview_tracking():
     iou_min     = float(data.get('iou_min',    0.01))
     max_dist    = float(data.get('max_distance', 30.0))
     gap_closing = int(data.get('gap_closing',   0))
-    remove_gaps = bool(data.get('remove_gaps',  True))
+    remove_gaps = cl(data.get('remove_gaps',  True))
     max_int     = float(data.get('max_int',     100))
 
     try:
@@ -446,7 +446,7 @@ def preview_cropping():
             cut_out_cells.cut_from_ctc(selected_path, margin=margin)
 
         # collect cell TIF files and build thumbnail list 
-        tif_files = sorted(followed_path.glob('*/*.tif'))
+        tif_files = sorted(followed_path.glob('*/I_*.tif'))
         if not tif_files:
             return jsonify({'success': False,
                             'error': 'No cell crops found in the followed folder.'})
@@ -1117,4 +1117,4 @@ def run_stats():
 
 if __name__ == '__main__':
 
-    app.run(debug=True, port=5000, use_reloader=False, threaded=True)
+    app.run(debug=False, port=5000, use_reloader=False, threaded=True)
