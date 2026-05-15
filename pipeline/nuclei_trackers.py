@@ -51,7 +51,7 @@ def run_tracker(path_list, method, min_length=20, **kwargs):
 
         tracker = trackastra_tracker(min_track_length=min_length, remove_gaps=remove_gaps)
     else:
-        assert("unknown tracking method")
+        raise ValueError(f"Unknown nuclei tracking method: {method!r}")
 
     for path in path_list:  
         path = Path(path)

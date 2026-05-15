@@ -54,7 +54,7 @@ def run_foci_tracker(path_list, method, **kwargs):
         tracker = trackastra_tracker(min_track_length=min_length, use_segmentations=use_seg)
         tracker_func = tracker.track
     else:
-        assert("unknown tracking method")
+        raise ValueError(f"Unknown foci tracking method: {method!r}")
 
     for path in path_list:  
         path = Path(path)

@@ -133,6 +133,264 @@ def plot_violin(plot_samples, max_bin, ax=None):
     ax.set_xlim(positions[0] - 1, positions[-1] + 1)
 
 
+
+##############
+
+# Additional plot functions to split the dwell time out over different time intervals or "subwindows"
+    
+##############
+
+
+def track_duration_in_window(results_dict, tmin, tmax):
+    
+    durations = []
+
+    TL = [tl for TL_cell in results_dict["track_lengths"] for tl in TL_cell]
+    TS = [ts for TS_cell in results_dict["track_start"] for ts in TS_cell]
+
+    for t_start, tl in zip(TS, TL):
+        t_end = t_start + tl
+        
+        if t_start <= tmax and t_end >= tmin:
+            durations.append(tl)
+
+    return durations
+
+
+def build_windowed_samples(plot_samples, time_windows):
+    """
+    This function assigns a track to a certain window if any part of the track is located in the window.
+    As a results, a track can be assigned to multiple windows as it can span multiple time windows
+    """
+    
+    windowed_samples = []
+    for tmin, tmax, label in time_windows:
+
+        samples = []
+        for sample in plot_samples:
+
+            durations = track_duration_in_window(sample["results_dict"], tmin, tmax)
+            new_sample = sample.copy()
+            new_sample["track_lengths"] = durations
+
+            samples.append(new_sample)
+
+        windowed_samples.append((label, samples))
+
+    return windowed_samples
+
+
+def build_windowed_samples_max_overlap(plot_samples, time_windows):
+    """
+    This function assigns a track to a certain window based on which window is has the most overlap with
+    """
+
+    # prepare empty structure
+    windowed_samples = [(label, []) for (_, _, label) in time_windows]
+
+    for sample in plot_samples:
+        
+        results_dict = sample["results_dict"]
+        TL = [tl for TL_cell in results_dict["track_lengths"] for tl in TL_cell]
+        TS = [ts for TS_cell in results_dict["track_start"] for ts in TS_cell]
+
+        window_durations = [[] for _ in time_windows]
+        for t_start, tl in zip(TS, TL):
+            t_end = t_start + tl
+
+            overlaps = [max(min(t_end, wmax) - max(t_start, wmin), 0) for wmin, wmax, _ in time_windows]
+
+            best_window = np.argmax(overlaps)
+            if overlaps[best_window] > 0:
+                window_durations[best_window].append(tl)
+
+        # add this sample to each window
+        for window_index, (_, _, label) in enumerate(time_windows):
+
+            new_sample = sample.copy()
+            new_sample["track_lengths"] = window_durations[window_index]
+
+            windowed_samples[window_index][1].append(new_sample)
+
+    return windowed_samples
+
+
+def plot_violin_time_windows(time_windows, max_bin, plot_samples, mode="max_overlap", ax=None):
+    """
+    Violin plot of dwell-time distributions split across user-defined time windows.
+
+    For each time window, a separate group of violins is drawn — one violin per
+    sample in `plot_samples` — allowing comparison of dwell-time distributions
+    both between samples and across time.
+
+    Parameters
+    ----------
+    time_windows : list of tuples
+        Each tuple is (tmin, tmax, label), where `tmin` and `tmax` define the
+        window boundaries (in minutes) and `label` is the string shown on the
+        x-axis for that window.
+    max_bin : int
+        Upper y-axis limit in minutes. Also controls the resolution of the
+        violin kernel density estimate (passed as `points` to violinplot).
+    plot_samples : list of dicts
+        Each dict must have: results_dict (containing "track_lengths" and
+        "track_start" as lists of lists, one per cell), name, color, and hatch.
+        Tracks are extracted from `results_dict` and assigned to time windows
+        according to `mode`.
+    mode : {"max_overlap", "greedy"}, default "max_overlap"
+        Strategy for assigning each track to a time window:
+        - "max_overlap": each track is assigned to the single window with which
+          it has the largest temporal overlap. Every track contributes to at
+          most one window.
+        - "greedy": each track is assigned to every window it overlaps with,
+          even partially. A track spanning multiple windows is counted in each
+          of them.
+    ax : matplotlib Axes, optional
+        Axes to draw on. If None, the current axes are used.    
+    """
+    
+    if ax is None:
+        ax = plt.gca()
+
+    if mode == "max_overlap":
+        windowed_samples = build_windowed_samples_max_overlap(plot_samples, time_windows)
+    elif mode == "greedy": 
+        windowed_samples = build_windowed_samples(plot_samples, time_windows)
+    else:
+        raise ValueError(f"Unknown mode: {mode}")
+
+    all_data = []
+    positions = []
+    colors = []
+    hatches = []
+
+    n_samples = len(plot_samples)
+    spacing = n_samples + 1
+    offsets = np.arange(n_samples) - (n_samples - 1) / 2
+
+    labels = []
+    for i, (label, samples) in enumerate(windowed_samples):
+        for j, sample in enumerate(samples):
+
+            pos = i * spacing + offsets[j]
+
+            all_data.append(sample["track_lengths"])
+            positions.append(pos)
+            colors.append(sample["color"])
+            hatches.append(sample["hatch"])
+        labels.append(label)
+
+    vp = ax.violinplot(all_data, positions=positions, showmeans=False, showmedians=False, showextrema=False, points=max_bin)
+
+    # style violins
+    for i, body in enumerate(vp["bodies"]):
+        body.set_facecolor("none")
+        body.set_edgecolor(colors[i])
+        body.set_linewidth(1.5)
+        body.set_hatch(hatches[i])
+        body.set_alpha(1.0)
+
+    # mean bars
+    bar_width = 0.4
+    for i, data in enumerate(all_data):
+        mean_val = np.mean(data)
+        ax.plot([positions[i] - bar_width/2, positions[i] + bar_width/2], [mean_val, mean_val], color=colors[i], linewidth=3)
+
+    # x ticks in center of each window
+    centers = [i * spacing for i in range(len(labels))]
+
+    ax.set_xticks(centers)
+    ax.set_xticklabels(labels)
+
+    ax.set_ylabel("Dwell time [min]")
+    ax.set_xlabel("Time window")
+    ax.set_ylim(0, max_bin)
+
+    # legend
+    legend_handles = []
+    for sample in plot_samples:
+        handle = plt.Line2D([0], [0], color=sample["color"], lw=2, label=sample["name"])
+        legend_handles.append(handle)
+    ax.legend(handles=legend_handles, loc=1)
+
+    
+
+##############
+
+# Make a plot for the result of the different track filtering modes
+    
+##############
+
+    
+
+def plot_violin_filter_modes(filter_results, filter_plot_samples, filter_modes, filter_mode_colors, max_bin, ax=None):
+    
+    if ax is None:
+        ax = plt.gca()
+
+    all_data = []
+    positions = []
+    colors = []
+    hatches = []
+
+    n_filters = len(filter_modes)
+
+    spacing = n_filters + 1
+    offsets = np.arange(n_filters) - (n_filters - 1)/2
+
+    labels = []
+
+    for i, sample in enumerate(filter_plot_samples):
+        for j, mode in enumerate(filter_modes):
+            data = filter_results[mode][i]["track_lengths"]
+
+            pos = i * spacing + offsets[j]
+
+            all_data.append(data)
+            positions.append(pos)
+
+            colors.append(filter_mode_colors[mode])
+            hatches.append(sample["hatch"])
+
+        labels.append(sample["name"])
+
+    vp = ax.violinplot(all_data, positions=positions, showmeans=False, showmedians=False, showextrema=False, points=max_bin)
+
+    # style violins
+    for i, body in enumerate(vp["bodies"]):
+        body.set_facecolor("none")
+        body.set_edgecolor(colors[i])
+        body.set_linewidth(1.5)
+        body.set_hatch(hatches[i])
+        body.set_alpha(1.0)
+
+    # mean bars
+    bar_width = 0.4
+    for i, data in enumerate(all_data):
+        mean_val = np.mean(data)
+        ax.plot([positions[i] - bar_width/2, positions[i] + bar_width/2], [mean_val, mean_val], color=colors[i], linewidth=3)
+
+    # x-axis
+    centers = [i * spacing for i in range(len(labels))]
+
+    ax.set_xticks(centers)
+    ax.set_xticklabels(labels)
+
+    ax.set_ylabel("Dwell time [min]")
+    ax.set_xlabel("Treatment condition")
+    ax.set_ylim(0, max_bin)
+
+    # legend for filter modes
+    legend_handles = []
+
+    for mode in filter_modes:
+        handle = plt.Line2D([0], [0], color=filter_mode_colors[mode], lw=3, label=mode)
+        legend_handles.append(handle)
+
+    ax.legend(handles=legend_handles, loc=1)
+
+
+
 ##############
 
 # Statistical tests

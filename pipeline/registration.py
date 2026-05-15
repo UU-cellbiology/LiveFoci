@@ -37,7 +37,7 @@ def register_array(stack, method, preprocess_function=None, **kwargs):
         elastix_object = ElastixReg(loss, preprocess_function)
         registered_stack = elastix_object.register_stack(stack)
     else:
-        assert("unknown registration method")
+        raise ValueError(f"Unknown registration method: {method!r}")
 
     return registered_stack
 
