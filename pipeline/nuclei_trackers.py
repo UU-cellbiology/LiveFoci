@@ -313,7 +313,7 @@ class NND_tracker(object):
 
         p = subprocess.run(cmd, capture_output=True, text=True, cwd=self.TP_dir)
         #print(p.stderr)
-        #print(p.stdout)        
+        #print(p.stdout)   
         
         # save the results to the format of the cell tracking challange
         self.save_to_ctc_format(save_path, temp_path, seg_sequence)

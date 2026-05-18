@@ -14,7 +14,6 @@ Programmatic:
     LiFT.run("data/", steps=[1, 2, 5, 6])
 """
 
-import sys
 from pathlib import Path
 from pipeline.general_utils.params_utils import load_params
 
@@ -24,7 +23,7 @@ def run(data_path: str, steps: list = None):
 
     steps: list of ints (1-6) to execute; None runs all present sections.
     """
-    data_path = Path(data_path)
+    data_path = Path(data_path).resolve()
     p = load_params(data_path)
 
     if not p:

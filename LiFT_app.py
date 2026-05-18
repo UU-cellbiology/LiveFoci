@@ -294,7 +294,7 @@ def preview_tracking():
     iou_min     = float(data.get('iou_min',    0.01))
     max_dist    = float(data.get('max_distance', 30.0))
     gap_closing = int(data.get('gap_closing',   0))
-    remove_gaps = cl(data.get('remove_gaps',  True))
+    remove_gaps = bool(data.get('remove_gaps',  True))
     max_int     = float(data.get('max_int',     100))
 
     try:

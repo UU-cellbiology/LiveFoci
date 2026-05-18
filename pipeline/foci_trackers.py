@@ -111,7 +111,7 @@ def write_isbi_xml(tracks, out_file):
 class GNN_tracker(object):
 
     """
-    Global nearest neigbor tracking algorithm
+    Global nearest neighbour tracking algorithm
     """
     
     def __init__(self, max_distance=5.0, gap_closing=3, min_track_length=4):
@@ -121,7 +121,7 @@ class GNN_tracker(object):
         self.gap_close = gap_closing
         self.min_length = min_track_length
 
-        print(f"running Global nearest neigbor tracking with: \nmax_distance = {self.max_dist} \ngap closing = {self.gap_close} \nmin track length = {self.min_length}")
+        print(f"running Global nearest neighbour tracking with: \nmax_distance = {self.max_dist} \ngap closing = {self.gap_close} \nmin track length = {self.min_length}")
               
 
     def build_cost_matrix(self, prev_dets, curr_dets):
