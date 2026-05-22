@@ -1,10 +1,7 @@
-#nuc_segmentation.py
 from pathlib import Path
 import skimage
 import numpy as np
 from lift.general_utils import wavelet_filter, load_sequence
-from cellpose import models
-import torch
 
 #####
 #
@@ -101,7 +98,10 @@ class CP_SAM(object):
     def __init__(self, flow_threshold=0.0, cellprob_threshold=-0.5,
                 tile_norm_blocksize=0, batch_size=8, scale_factor=1):
 
-        
+        from lift._helpers import _require_cellpose_sam
+        _require_cellpose_sam()
+        from cellpose import models
+    
         self.fT = flow_threshold
         self.cT = cellprob_threshold
         self.tnb = tile_norm_blocksize
@@ -139,6 +139,11 @@ class CP_V3(object):
     """
 
     def __init__(self, flow_threshold=0.0, cellprob_threshold=-0.5, diameter=140):
+        from lift._helpers import _require_cellpose_v3
+        _require_cellpose_v3()
+        from cellpose import models
+        import torch
+
         self.fT = flow_threshold
         self.cT = cellprob_threshold
         self.diam = diameter

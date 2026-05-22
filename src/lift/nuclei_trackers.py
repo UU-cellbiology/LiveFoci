@@ -1,4 +1,3 @@
-#nuclei_trackers.py
 from pathlib import Path
 import os
 import shutil
@@ -426,7 +425,8 @@ class trackastra_tracker(object):
     
     def __init__(self, min_track_length=4, remove_gaps=True):
         super().__init__()
-
+        from lift._helpers import _require_trackastra
+        _require_trackastra()
         from trackastra.model import Trackastra
         from trackastra.tracking import graph_to_ctc
         import torch

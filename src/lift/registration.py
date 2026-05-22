@@ -104,14 +104,9 @@ class ElastixReg:
     _PARAMS_DIR = Path(__file__).resolve().parent / "elastix_params"
 
     def __init__(self, loss='MSE', preprocess_function=None, previous_initialisation=True):
-        try:
-            import itk
-            self._itk = itk
-        except ImportError:
-            raise ImportError(
-                "itk-elastix is required for elastix registration. "
-                "Install it with: pip install \"LiFT[elastix]\""
-            )
+        from lift._helpers import _require_elastix
+        _require_elastix()
+        import itk
 
         self.loss             = loss
         self.preproc_function = preprocess_function

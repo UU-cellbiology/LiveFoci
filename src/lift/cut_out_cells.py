@@ -1,5 +1,3 @@
-#cut_out_cells.py
-
 # -*- coding: utf-8 -*-
 """
 Created on Tue Nov 19 15:04:22 2024

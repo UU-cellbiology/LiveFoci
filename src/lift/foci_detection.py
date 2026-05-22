@@ -1,10 +1,8 @@
-# foci_detection.py
 from pathlib import Path
 import numpy as np
 import skimage
 import scipy
 from lift.general_utils.wavelet_filter import wavelets
-
 
 #####
 #
@@ -515,8 +513,10 @@ class SpotiflowDetector(BaseDetector):
     name = "Spotiflow"
 
     def __init__(self, **params):
-        
+        from lift._helpers import _require_spotiflow
+        _require_spotiflow()
         from spotiflow.model import Spotiflow
+
         model_name = params["model_name"]
         self.model = Spotiflow.from_pretrained("general")
 

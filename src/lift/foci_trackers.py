@@ -1,5 +1,3 @@
-#foci_trackers.py
-
 from pathlib import Path
 import os
 import shutil
@@ -515,6 +513,8 @@ class trackastra_tracker(object):
     def __init__(self, min_track_length=4, use_segmentations=True):
         super().__init__()
 
+        from lift._helpers import _require_trackastra
+        _require_trackastra()
         from trackastra.model import Trackastra
         import torch
 
