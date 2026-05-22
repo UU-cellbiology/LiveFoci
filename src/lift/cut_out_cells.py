@@ -1,4 +1,4 @@
-__init__.py
+#cut_out_cells.py
 
 # -*- coding: utf-8 -*-
 """

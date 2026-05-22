@@ -1,31 +1,19 @@
-"""lift – Live Foci Tracking.
+"""lift – Live Foci Tracking."""
 
-Public API — import lift and call individual steps directly:
-
-    import lift
-
-    # config-driven (reads parameters.yml):
-    lift.segment("data/")
-
-    # explicit parameters (no config needed):
-    lift.segment("data/", method="cellpose_v3", min_area=500, diameter=120)
-
-    # full pipeline from config:
-    lift.run("data/")
-    lift.run("data/", steps=[1, 2, 5, 6])
-"""
-
-from lift.cli import run  # re-export full pipeline runner
+from lift._helpers import _make_seg_method, _make_preproc
 
 
-# ── step 1: nuclei segmentation ──────────────────────────────────────────────
+def run(data_path, steps=None):
+    """Run full pipeline from parameters.yml. Equivalent to the `lift` CLI command."""
+    from lift.cli import run as _run
+    return _run(data_path, steps=steps)
+
 
 def segment(data_path, method=None, min_area=None, preprocessing=None, **kwargs):
     """Segment nuclei in all Pos*/raw folders under data_path.
 
     Parameters
     ----------
-    data_path : str | Path
     method : "cellpose_sam" | "cellpose_v3"  (default from config or "cellpose_sam")
     min_area : int  minimum nucleus area in pixels  (default 1000)
     preprocessing : "wavelet_filtering" | "contrast_adjuster" | None
@@ -34,19 +22,15 @@ def segment(data_path, method=None, min_area=None, preprocessing=None, **kwargs)
     """
     from pathlib import Path
     from lift import nuc_segmentation
-    from lift.cli import _make_seg_method, _make_preproc
-    from lift.general_utils.params_utils import load_params
 
     data_path = Path(data_path).resolve()
+    cfg      = _step_cfg(data_path, "step1_segmentation")
+    seg_cfg  = cfg.get("segmentation",  {})
+    prep_cfg = cfg.get("preprocessing", {})
 
-    # merge: explicit kwargs win, fall back to config, then to defaults
-    cfg = _step_cfg(data_path, "step1_segmentation")
-    seg_cfg   = cfg.get("segmentation",  {})
-    prep_cfg  = cfg.get("preprocessing", {})
-
-    method       = method       or seg_cfg.get("method",      "cellpose_sam")
-    min_area     = min_area     or seg_cfg.get("min_area",    1000)
-    preprocessing = preprocessing or prep_cfg.get("method")   or None
+    method        = method        or seg_cfg.get("method",   "cellpose_sam")
+    min_area      = min_area      or seg_cfg.get("min_area", 1000)
+    preprocessing = preprocessing or prep_cfg.get("method")  or None
 
     method_params = {
         "flow_threshold":     seg_cfg.get("flow_threshold",      0.0),
@@ -54,7 +38,6 @@ def segment(data_path, method=None, min_area=None, preprocessing=None, **kwargs)
         **seg_cfg.get(method, {}),
         **kwargs,
     }
-
     preproc_kwargs = prep_cfg.get(preprocessing, {}) if preprocessing else {}
 
     seg_method   = _make_seg_method(method, method_params)
@@ -65,8 +48,6 @@ def segment(data_path, method=None, min_area=None, preprocessing=None, **kwargs)
         raw_paths, seg_method, preproc_func, min_area=min_area, **preproc_kwargs
     )
 
-
-# ── step 2: nuclei tracking ──────────────────────────────────────────────────
 
 def track_nuclei(data_path, method=None, min_length=None, **kwargs):
     """Track segmented nuclei using CTC-format masks.
@@ -92,8 +73,6 @@ def track_nuclei(data_path, method=None, min_length=None, **kwargs):
     nuclei_trackers.run_tracker(seg_paths, method=method, min_length=min_length, **kw)
 
 
-# ── step 3: cell cropping ────────────────────────────────────────────────────
-
 def crop(data_path, margin=None):
     """Cut individual cells from tracked sequences.
 
@@ -112,10 +91,8 @@ def crop(data_path, margin=None):
         try:
             cut_out_cells.cut_from_ctc(pp, margin=margin)
         except ValueError:
-            pass  # output folder already exists
+            pass
 
-
-# ── step 4: registration ─────────────────────────────────────────────────────
 
 def register(data_path, method=None, preprocessing=None, **kwargs):
     """Register cropped cell stacks to correct for motion.
@@ -128,21 +105,20 @@ def register(data_path, method=None, preprocessing=None, **kwargs):
     """
     from pathlib import Path
     from lift import registration
-    from lift.cli import _make_preproc
 
     data_path = Path(data_path).resolve()
     cfg = _step_cfg(data_path, "step4_registration")
 
-    method       = method       or cfg.get("method")       or "stackreg"
+    method        = method        or cfg.get("method")        or "stackreg"
     preprocessing = preprocessing or cfg.get("preprocessing") or None
-    kw           = {**cfg.get("elastix", {}), **kwargs} if method == "elastix" else kwargs
+    kw            = {**cfg.get("elastix", {}), **kwargs} if method == "elastix" else kwargs
 
     preproc_func = _make_preproc(preprocessing)
-    followed = sorted(data_path.glob("*/*/Pos*/results/followed/*/I_*.tif"))
-    registration.run_registration(followed, method=method, preprocess_function=preproc_func, **kw)
+    followed     = sorted(data_path.glob("*/*/Pos*/results/followed/*/I_*.tif"))
+    registration.run_registration(
+        followed, method=method, preprocess_function=preproc_func, **kw
+    )
 
-
-# ── step 5: foci detection ───────────────────────────────────────────────────
 
 def detect(data_path, method=None, threshold=None, return_segmentation=None, **kwargs):
     """Detect foci in registered cell stacks.
@@ -161,26 +137,26 @@ def detect(data_path, method=None, threshold=None, return_segmentation=None, **k
     data_path = Path(data_path).resolve()
     cfg = _step_cfg(data_path, "step5_detection")
 
-    method             = method             or cfg.get("method")
-    threshold          = threshold          if threshold is not None else cfg.get("threshold")
+    method              = method    or cfg.get("method")
+    threshold           = threshold if threshold is not None else cfg.get("threshold")
     return_segmentation = return_segmentation if return_segmentation is not None \
                           else cfg.get("return_segmentation", False)
-    method_params      = {**cfg.get("params", {}), **kwargs}
+    method_params       = {**cfg.get("params", {}), **kwargs}
 
     if method is None:
-        raise ValueError("detect() requires a method. "
-                         "Pass method= or set step5_detection.method in parameters.yml")
+        raise ValueError(
+            "detect() requires a method. "
+            "Pass method= or set step5_detection.method in parameters.yml"
+        )
 
     detector, threshold = foci_detection.create_detector(
         method, params=method_params, threshold=threshold
     )
-
     registered = sorted(data_path.glob("*/*/Pos*/results/registered/*/I_*.tif"))
-    foci_detection.run_detection(registered, detector, threshold,
-                                 return_segmentation=return_segmentation)
+    foci_detection.run_detection(
+        registered, detector, threshold, return_segmentation=return_segmentation
+    )
 
-
-# ── step 6: foci tracking ────────────────────────────────────────────────────
 
 def track_foci(data_path, method=None, min_track_length=None, **kwargs):
     """Link detected foci across frames into trajectories.
@@ -204,8 +180,10 @@ def track_foci(data_path, method=None, min_track_length=None, **kwargs):
     kw = {**cfg.get(method, {}), **kwargs} if method else kwargs
 
     if method is None:
-        raise ValueError("track_foci() requires a method. "
-                         "Pass method= or set step6_tracking.method in parameters.yml")
+        raise ValueError(
+            "track_foci() requires a method. "
+            "Pass method= or set step6_tracking.method in parameters.yml"
+        )
 
     registered = sorted(data_path.glob("*/*/Pos*/results/registered/*/I_*.tif"))
     foci_trackers.run_foci_tracker(
@@ -213,16 +191,11 @@ def track_foci(data_path, method=None, min_track_length=None, **kwargs):
     )
 
 
-# ── shared helper ─────────────────────────────────────────────────────────────
-
 def _step_cfg(data_path, step_key: str) -> dict:
-    """Load parameters.yml and return the section for *step_key*, or {} if absent."""
     from lift.general_utils.params_utils import load_params
     p = load_params(data_path) or {}
     return p.get(step_key, {})
 
-
-# ── public surface ────────────────────────────────────────────────────────────
 
 __all__ = [
     "run",

@@ -59,10 +59,10 @@
     <parameter ID="LinkingBufferSize" value="4.0"/>
     
     
-    <parameter ID="MinimumTrackLength" value="5.0"/>
+    <parameter ID="MinimumTrackLength" value="36.0"/>
     
     
-    <parameter ID="gateDistanceDiffusion" value="5.0"/>
+    <parameter ID="gateDistanceDiffusion" value="30.0"/>
     
     
     <parameter ID="gateDistanceDirectedMotion" value="4.0"/>
@@ -83,7 +83,7 @@
     <parameter ID="costAmplificationFactor" value="1.0"/>
     
     
-    <parameter ID="nrOfGapsToClose" value="1.0"/>
+    <parameter ID="nrOfGapsToClose" value="0.0"/>
     
 
   </root>
