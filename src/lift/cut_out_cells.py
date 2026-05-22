@@ -1,3 +1,5 @@
+__init__.py
+
 # -*- coding: utf-8 -*-
 """
 Created on Tue Nov 19 15:04:22 2024
@@ -211,10 +213,3 @@ if __name__ == "__main__":
         #box_size = 140
         #cut_from_xml(path, time_points=360, box_size=box_size)
     
-    
- 
-
-        
-        
-
-   

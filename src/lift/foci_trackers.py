@@ -356,14 +356,14 @@ class NGMA_track(object):
         self.base_dir =  Path(__file__).parent.resolve()  #Path.cwd()  
 
         if os.name == "nt":  # command for windows
-            self.java = self.base_dir / "NGMA_utils" / "ImageJ" / "jre" / "bin" / "java.exe"
+            self.java = self.base_dir / "tracker_utils" / "ImageJ" / "jre" / "bin" / "java.exe"
             self.classpath_sep = ";"
         else:  # command for other systems
-            self.java = self.base_dir / "NGMA_utils" / "ImageJ" / "jre" / "bin" / "java"
+            self.java = self.base_dir / "tracker_utils" / "ImageJ" / "jre" / "bin" / "java"
             self.classpath_sep = ":"
                             
         # location of the java tracking plugin
-        self.TP_dir = self.base_dir / "NGMA_utils" / "SOSTracker commandline"
+        self.TP_dir = self.base_dir / "tracker_utils" / "SOSTracker commandline"
 
         # Classpath jars
         jars = ["VENI_.jar", "ij.jar", "imagescience.jar", "Jama-1.0.2.jar"]
