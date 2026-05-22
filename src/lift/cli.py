@@ -50,7 +50,7 @@ def run(data_path: str, steps: list = None):
         print("── Step 2: Nuclei Tracking")
         from lift import nuclei_trackers
 
-        method        = s['method']
+        method        = s.get('method') or None
         min_length    = s.get('min_length', 20)
         method_params = s.get(method, {})
 
@@ -75,7 +75,7 @@ def run(data_path: str, steps: list = None):
         print("── Step 4: Registration")
         from lift import registration
 
-        method       = s['method']
+        method = s.get('method') or None
         preproc_func = _make_preproc(s.get('preprocessing'))
         kwargs       = s.get('elastix', {}) if method == 'elastix' else {}
 
@@ -91,8 +91,8 @@ def run(data_path: str, steps: list = None):
 
         s = dict(s)
         method_params    = s.pop('params', {})
-        method           = s.pop('method')
-        threshold        = s.pop('threshold')
+        method           = s.pop('method', None)
+        threshold        = s.pop('threshold', None)
         return_seg       = s.pop('return_segmentation', False)
 
         detector, threshold = foci_detection.create_detector(
@@ -109,7 +109,7 @@ def run(data_path: str, steps: list = None):
         print("── Step 6: Foci Tracking")
         from lift import foci_trackers
 
-        method           = s['method']
+        method           = s.get('method') or None
         min_track_length = s.get('min_track_length', 3)
         method_params    = s.get(method, {})
 

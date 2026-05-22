@@ -28,7 +28,7 @@ def segment(data_path, method=None, min_area=None, preprocessing=None, **kwargs)
     seg_cfg  = cfg.get("segmentation",  {})
     prep_cfg = cfg.get("preprocessing", {})
 
-    method        = method        or seg_cfg.get("method",   "cellpose_sam")
+    method = method or seg_cfg.get("method") or None
     min_area      = min_area      or seg_cfg.get("min_area", 1000)
     preprocessing = preprocessing or prep_cfg.get("method")  or None
 
@@ -65,7 +65,7 @@ def track_nuclei(data_path, method=None, min_length=None, **kwargs):
     data_path = Path(data_path).resolve()
     cfg = _step_cfg(data_path, "step2_tracking")
 
-    method     = method     or cfg.get("method",     "IOU")
+    method = method or cfg.get("method") or None
     min_length = min_length or cfg.get("min_length", 20)
     kw         = {**cfg.get(method, {}), **kwargs}
 
@@ -109,7 +109,7 @@ def register(data_path, method=None, preprocessing=None, **kwargs):
     data_path = Path(data_path).resolve()
     cfg = _step_cfg(data_path, "step4_registration")
 
-    method        = method        or cfg.get("method")        or "stackreg"
+    method = method or cfg.get("method") or None
     preprocessing = preprocessing or cfg.get("preprocessing") or None
     kw            = {**cfg.get("elastix", {}), **kwargs} if method == "elastix" else kwargs
 
