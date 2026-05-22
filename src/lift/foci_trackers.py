@@ -32,7 +32,12 @@ def run_foci_tracker(path_list, method, **kwargs):
     use_segmentation: for Trackastra only, True for using the segmented objects to calculate features 
                         and False for using detected coordinates only
     """
-    
+    if method is None:
+        from lift._helpers import _detect_foci_tracker
+        method = _detect_foci_tracker()
+
+    print(f"── foci tracking method:     {method}")
+
     if method=='GNN':
         max_dist = kwargs.pop("max_distance", 5.0)
         gap_close = kwargs.pop("gap_closing", 2)

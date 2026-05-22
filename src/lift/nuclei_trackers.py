@@ -17,46 +17,45 @@ from lift.general_utils import load_sequence
 #####
 
 
-def run_tracker(path_list, method, min_length=20, **kwargs):
+def run_tracker(path_list, method=None, min_length=20, **kwargs):
     """
     performs nuclei tracking using the specified tracking method 
     
     path_list: should be a list of paths with the folders of segmented masks that you would like to track. 
-
     method: string specifying which tracking method to use. this tracking method takes the segmented masks
     as input to perform the linking between the nuclei over time. The method should save the output according
     to the format of the cell tracking challange
-
     min_length: the minimum allowed length of the tracks in the number of frames
 
-    optinal parameters:    
+    optional parameters:    
     iou_min: IOU tracker only, the minimum overlap required before considering it to be linked
     gap_closing: NND tracker only, number of frames to close between tracks when detections are missing
     max_distance: NND tracker only, the maximum allowed distance for linking detections [pixels]
     remove_gaps: for Trackastra only, when True splits tracks into separate gaps whenever there is 
-        a missing detections
+        a missing detection
     """
-    
-    if method=='IOU':
+    if method is None:
+        from lift._helpers import _detect_nuclei_tracker
+        method = _detect_nuclei_tracker()
+
+    print(f"── nuclei tracking method:   {method}")
+
+    if method == 'IOU':
         iou_min = kwargs.pop("iou_min", 0.01)
-        
         tracker = IOU_tracker(min_track_length=min_length, iou_min=iou_min)
-    elif method=='NND':
-        max_dist = kwargs.pop("max_distance", 30.0)
-        gap_close = kwargs.pop("gap_closing", 0)
-
-        tracker = NND_tracker(min_track_length=min_length, max_distance=max_dist, gap_closing=gap_close)
-    elif method=='trackastra':
+    elif method == 'NND':
+        max_dist  = kwargs.pop("max_distance", 30.0)
+        gap_close = kwargs.pop("gap_closing",  0)
+        tracker   = NND_tracker(min_track_length=min_length, max_distance=max_dist, gap_closing=gap_close)
+    elif method == 'trackastra':
         remove_gaps = kwargs.pop("remove_gaps", True)
-
-        tracker = trackastra_tracker(min_track_length=min_length, remove_gaps=remove_gaps)
+        tracker     = trackastra_tracker(min_track_length=min_length, remove_gaps=remove_gaps)
     else:
         raise ValueError(f"Unknown nuclei tracking method: {method!r}")
 
-    for path in path_list:  
+    for path in path_list:
         path = Path(path)
         tracker.track(path)
-
 
 
 #####

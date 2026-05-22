@@ -22,6 +22,11 @@ def register_array(stack, method, preprocess_function=None, **kwargs):
     method: "stackreg" | "elastix"
     preprocess_function: optional function applied before computing transforms
     """
+    if method is None:
+        from lift._helpers import _detect_registration_method
+        method = _detect_registration_method()
+    print(f"── registration method:      {method}")
+    
     if method == 'stackreg':
         return stackreg_registration(stack, preprocess_function)
     elif method == 'elastix':
