@@ -2,7 +2,7 @@ from pathlib import Path
 import numpy as np
 import skimage
 import scipy
-from pipeline.general_utils.wavelet_filter import wavelets
+from lift.general_utils.wavelet_filter import wavelets
 
 
 #####

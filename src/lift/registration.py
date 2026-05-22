@@ -5,7 +5,7 @@ import numpy as np
 import skimage
 from pystackreg import StackReg
 from pystackreg.util import to_uint16
-from pipeline.general_utils.wavelet_filter import wavelets
+from lift.general_utils.wavelet_filter import wavelets
 
 #####
 #

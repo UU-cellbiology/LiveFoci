@@ -1,7 +1,7 @@
 from pathlib import Path
 import skimage
 import numpy as np
-from pipeline.general_utils import wavelet_filter, load_sequence
+from lift.general_utils import wavelet_filter, load_sequence
 from cellpose import models
 import torch
 

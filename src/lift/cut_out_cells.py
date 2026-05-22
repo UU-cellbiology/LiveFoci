@@ -15,7 +15,7 @@ from xml.dom import minidom
 import string
 import random
 import matplotlib.pyplot as plt
-from pipeline.general_utils import load_sequence
+from lift.general_utils import load_sequence
 
 
 

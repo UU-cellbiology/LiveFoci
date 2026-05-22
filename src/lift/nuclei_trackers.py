@@ -6,7 +6,7 @@ import subprocess
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 import skimage
-from pipeline.general_utils import load_sequence
+from lift.general_utils import load_sequence
 
 
 
