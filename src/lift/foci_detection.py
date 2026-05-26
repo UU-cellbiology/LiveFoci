@@ -226,6 +226,12 @@ def signal_thresholding(image, threshold):
     
     return detections, labels
 
+# NOTE: this function was missing and should be reviewed before being accepted. @Twolf151
+def H_dome_transform(image, h):
+    """Suppress all regional maxima with height less than h."""
+    marker = np.clip(image - h, 0, None)
+    reconstructed = skimage.morphology.reconstruction(marker, image, method='dilation')
+    return image - reconstructed
 
 #####
 #
