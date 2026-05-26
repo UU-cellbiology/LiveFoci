@@ -9,9 +9,6 @@ import numpy as np
 from pathlib import Path
 import skimage
 from tifffile import imwrite
-import os
-from glob import glob
-from xml.dom import minidom 
 import string
 import random
 import matplotlib.pyplot as plt
