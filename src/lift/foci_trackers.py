@@ -36,7 +36,7 @@ def run_foci_tracker(path_list, method, **kwargs):
         from lift._helpers import _detect_foci_tracker
         method = _detect_foci_tracker()
 
-    print(f"── foci tracking method:     {method}")
+    print(f"foci tracking method:     {method}\n")
 
     if method=='GNN':
         max_dist = kwargs.pop("max_distance", 5.0)
@@ -124,10 +124,7 @@ class GNN_tracker(object):
 
         self.max_dist = max_distance
         self.gap_close = gap_closing
-        self.min_length = min_track_length
-
-        print(f"running Global nearest neighbour tracking with: \nmax_distance = {self.max_dist} \ngap closing = {self.gap_close} \nmin track length = {self.min_length}")
-              
+        self.min_length = min_track_length              
 
     def build_cost_matrix(self, prev_dets, curr_dets):
         """

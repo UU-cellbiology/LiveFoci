@@ -61,7 +61,7 @@ def run(data_path: str, steps: list = None):
 
     # ── step 3: cell cropping ────────────────────────────────────────────────
     if _should_run(3) and (s := p.get('step3_cropping')):
-        print("── Step 3: Cell Cropping")
+        print("── Step 3: Cell Cropping\n")
         from lift import cut_out_cells
 
         for pp in sorted(data_path.glob("*/*/Pos*")):
@@ -86,7 +86,7 @@ def run(data_path: str, steps: list = None):
 
     # ── step 5: foci detection ───────────────────────────────────────────────
     if _should_run(5) and (s := p.get('step5_detection')):
-        print("── Step 5: Foci Detection")
+        print("── Step 5: Foci Detection\n")
         from lift import foci_detection
 
         s = dict(s)

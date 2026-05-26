@@ -25,7 +25,7 @@ def register_array(stack, method, preprocess_function=None, **kwargs):
     if method is None:
         from lift._helpers import _detect_registration_method
         method = _detect_registration_method()
-    print(f"── registration method:      {method}")
+    print(f"registration method:      {method}\n")
     
     if method == 'stackreg':
         return stackreg_registration(stack, preprocess_function)
@@ -45,11 +45,6 @@ def run_registration(path_list, method, preprocess_function=None, save_name='reg
     preprocess_function: optional preprocessing applied before computing transforms
     save_name: output subfolder name (default "registered")
     """
-    if preprocess_function:
-        print(f"running {method} registration with {preprocess_function.__name__} as preprocessing")
-    else:
-        print(f"running {method} registration without preprocessing")
-
     for path in path_list:
         path = Path(path)
         stack = skimage.io.imread(path)

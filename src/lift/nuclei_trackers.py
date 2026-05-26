@@ -38,7 +38,7 @@ def run_tracker(path_list, method=None, min_length=20, **kwargs):
         from lift._helpers import _detect_nuclei_tracker
         method = _detect_nuclei_tracker()
 
-    print(f"── nuclei tracking method:   {method}")
+    print(f"nuclei tracking method:   {method}\n")
 
     if method == 'IOU':
         iou_min = kwargs.pop("iou_min", 0.01)
@@ -311,8 +311,8 @@ class NND_tracker(object):
         cmd = [str(self.java), *self.plugins, *args]
 
         p = subprocess.run(cmd, capture_output=True, text=True, cwd=self.TP_dir)
-        #print(p.stderr)
-        #print(p.stdout)   
+        print(p.stderr)
+        print(p.stdout)   
         
         # save the results to the format of the cell tracking challange
         self.save_to_ctc_format(save_path, temp_path, seg_sequence)

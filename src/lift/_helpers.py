@@ -161,7 +161,7 @@ def _make_seg_method(name, params):
     if name is None:
         name = _detect_seg_method()
 
-    print(f"── segmentation method:      {name}")
+    print(f"segmentation method:      {name}")
 
     if name == 'cellpose_sam':
         _require_cellpose_sam()
@@ -189,7 +189,7 @@ def _make_seg_method(name, params):
 
 def _make_preproc(name):
     if name in (None, 'None', ''):
-        print(f"── preprocessing:            none")
+        print(f"preprocessing:            none\n")
         return None
 
     mapping = {
@@ -205,7 +205,7 @@ def _make_preproc(name):
             f"Available: {list(mapping)}"
         )
 
-    print(f"── preprocessing:            {name}")
+    print(f"preprocessing:            {name}\n")
     module_path, func_name = mapping[name]
     mod = importlib.import_module(module_path)
     return getattr(mod, func_name)
