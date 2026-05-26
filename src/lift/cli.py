@@ -39,8 +39,7 @@ def run(data_path: str, steps: list = None):
         method         = _make_seg_method(method_name, method_params)
         preproc_func   = _make_preproc(preproc_name)
         preproc_kwargs = prepr.get(preproc_name, {}) if preproc_name not in (None, 'None', '') else {}
-
-        raw_paths = sorted(data_path.glob("*/*/Pos*/raw"))
+        raw_paths = sorted(data_path.rglob("Pos*/raw"))        
         nuc_segmentation.segment_folderlist(
             raw_paths, method, preproc_func, min_area=min_area, **preproc_kwargs
         )
@@ -54,7 +53,7 @@ def run(data_path: str, steps: list = None):
         min_length    = s.get('min_length', 20)
         method_params = s.get(method, {})
 
-        seg_paths = sorted(data_path.glob("*/*/Pos*/results/result_cell_seg"))
+        seg_paths = sorted(data_path.rglob("Pos*/results/result_cell_seg"))
         nuclei_trackers.run_tracker(
             seg_paths, method=method, min_length=min_length, **method_params
         )
@@ -64,7 +63,7 @@ def run(data_path: str, steps: list = None):
         print("── Step 3: Cell Cropping\n")
         from lift import cut_out_cells
 
-        for pp in sorted(data_path.glob("*/*/Pos*")):
+        for pp in sorted(data_path.rglob("Pos*")):
             try:
                 cut_out_cells.cut_from_ctc(pp, margin=s.get('margin', 30))
             except ValueError:
@@ -79,7 +78,7 @@ def run(data_path: str, steps: list = None):
         preproc_func = _make_preproc(s.get('preprocessing'))
         kwargs       = s.get('elastix', {}) if method == 'elastix' else {}
 
-        followed = sorted(data_path.glob("*/*/Pos*/results/followed/*/I_*.tif"))
+        followed = sorted(data_path.rglob("Pos*/results/followed/*/I_*.tif"))
         registration.run_registration(
             followed, method=method, preprocess_function=preproc_func, **kwargs
         )
@@ -99,7 +98,7 @@ def run(data_path: str, steps: list = None):
             method, params=method_params, threshold=threshold
         )
 
-        registered = sorted(data_path.glob("*/*/Pos*/results/registered/*/I_*.tif"))
+        registered = sorted(data_path.rglob("Pos*/results/registered/*/I_*.tif"))
         foci_detection.run_detection(
             registered, detector, threshold, return_segmentation=return_seg
         )
@@ -113,7 +112,7 @@ def run(data_path: str, steps: list = None):
         min_track_length = s.get('min_track_length', 3)
         method_params    = s.get(method, {})
 
-        registered = sorted(data_path.glob("*/*/Pos*/results/registered/*/I_*.tif"))
+        registered = sorted(data_path.rglob("Pos*/results/registered/*/I_*.tif"))
         foci_trackers.run_foci_tracker(
             registered, method=method, min_track_length=min_track_length, **method_params
         )

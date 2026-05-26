@@ -50,8 +50,7 @@ def segment_folderlist(folders_list, method, preproc_function=None, min_area=100
                         set to None to apply no preprocessing
     min_area: nuclei with an area (in pixels) smaller than this are removed
     **kwargs: the additional arguments for the preprocessing function
-    """
-    
+    """    
     for folder in folders_list:
         folder = Path(folder) 
         print("processing:", folder)

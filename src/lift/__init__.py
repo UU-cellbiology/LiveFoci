@@ -43,7 +43,7 @@ def segment(data_path, method=None, min_area=None, preprocessing=None, **kwargs)
     seg_method   = _make_seg_method(method, method_params)
     preproc_func = _make_preproc(preprocessing)
 
-    raw_paths = sorted(data_path.glob("*/*/Pos*/raw"))
+    raw_paths = sorted(data_path.rglob("Pos*/raw"))
     nuc_segmentation.segment_folderlist(
         raw_paths, seg_method, preproc_func, min_area=min_area, **preproc_kwargs
     )
@@ -69,7 +69,7 @@ def track_nuclei(data_path, method=None, min_length=None, **kwargs):
     min_length = min_length or cfg.get("min_length", 20)
     kw         = {**cfg.get(method, {}), **kwargs}
 
-    seg_paths = sorted(data_path.glob("*/*/Pos*/results/result_cell_seg"))
+    seg_paths = sorted(data_path.rglob("Pos*/results/result_cell_seg"))
     nuclei_trackers.run_tracker(seg_paths, method=method, min_length=min_length, **kw)
 
 
@@ -87,7 +87,7 @@ def crop(data_path, margin=None):
     cfg    = _step_cfg(data_path, "step3_cropping")
     margin = margin if margin is not None else cfg.get("margin", 30)
 
-    for pp in sorted(data_path.glob("*/*/Pos*")):
+    for pp in sorted(data_path.rglob("Pos*")):
         try:
             cut_out_cells.cut_from_ctc(pp, margin=margin)
         except ValueError:
@@ -114,7 +114,7 @@ def register(data_path, method=None, preprocessing=None, **kwargs):
     kw            = {**cfg.get("elastix", {}), **kwargs} if method == "elastix" else kwargs
 
     preproc_func = _make_preproc(preprocessing)
-    followed     = sorted(data_path.glob("*/*/Pos*/results/followed/*/I_*.tif"))
+    followed     = sorted(data_path.rglob("Pos*/results/followed/*/I_*.tif"))
     registration.run_registration(
         followed, method=method, preprocess_function=preproc_func, **kw
     )
@@ -152,7 +152,7 @@ def detect(data_path, method=None, threshold=None, return_segmentation=None, **k
     detector, threshold = foci_detection.create_detector(
         method, params=method_params, threshold=threshold
     )
-    registered = sorted(data_path.glob("*/*/Pos*/results/registered/*/I_*.tif"))
+    registered = sorted(data_path.rglob("Pos*/results/registered/*/I_*.tif"))
     foci_detection.run_detection(
         registered, detector, threshold, return_segmentation=return_segmentation
     )
@@ -185,7 +185,7 @@ def track_foci(data_path, method=None, min_track_length=None, **kwargs):
             "Pass method= or set step6_tracking.method in parameters.yml"
         )
 
-    registered = sorted(data_path.glob("*/*/Pos*/results/registered/*/I_*.tif"))
+    registered = sorted(data_path.rglob("Pos*/results/registered/*/I_*.tif"))
     foci_trackers.run_foci_tracker(
         registered, method=method, min_track_length=min_track_length, **kw
     )
