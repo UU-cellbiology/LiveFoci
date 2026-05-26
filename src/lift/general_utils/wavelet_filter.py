@@ -7,26 +7,18 @@ Created on Wed Dec  3 16:28:45 2025
 
 from glob import glob
 import numpy as np
-import skimage
-import matplotlib.pyplot as plt
-import torch 
-import torch.nn.functional as F
-from torchvision.transforms import functional as TF
 
-
-def get_kernel(scale, base_kernel=torch.tensor([1 / 16, 1 / 4, 3 / 8, 1 / 4, 1 / 16])):
+def get_kernel(scale, base_kernel=None):
     import torch
     import torch.nn.functional as F
-    device = "cpu"  # torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+    if base_kernel is None:
+        base_kernel = torch.tensor([1 / 16, 1 / 4, 3 / 8, 1 / 4, 1 / 16])
     non_zero_idx = np.arange(0, torch.numel(base_kernel), 1) * scale
     kernel_1D = torch.zeros(non_zero_idx[-1] + 1)
     kernel_1D[non_zero_idx] = base_kernel
-    kernel_1D = kernel_1D.unsqueeze(0)  # add extra dimension to transpose and multiply in next line
+    kernel_1D = kernel_1D.unsqueeze(0)
     kernel_2D = (kernel_1D * kernel_1D.T).view(1, 1, torch.numel(kernel_1D), torch.numel(kernel_1D))
-
-    return kernel_2D.to(device)
-
+    return kernel_2D
 
 def get_scale_k(image, k):
     import torch
@@ -52,27 +44,3 @@ def wavelets(img, scales=3):
         I.append(img.detach().cpu().squeeze().numpy())
 
     return W, I
-
-if __name__ == "__main__":
-    file = r"C:\Users\084011\Documents\projects\live_cell_foci_analysis\Ho_Y_data\test_method\data\20240717_Y_15_Gy\Position004\0200.tif"
-    
-    img = skimage.io.imread(file) 
-    plt.imshow(img, cmap='gray', vmax=0.6*img.max())
-    
-    W, I = wavelets(img, scales=5)
-
-    start_scale = 0
-    factor = 2.0
-    for w in W:
-      threshold = factor * (np.std(w))**2
-      w[w**2 > threshold] = 0
-    coefs = np.sum(np.stack(W[start_scale:]),0)
-    recon_full = I[-1] + coefs
-    
-    fig, ax = plt.subplots(nrows=1, ncols=3, dpi=500, layout='tight')
-    ax[0].imshow(img, cmap='gray')
-    ax[1].imshow(I[-1], cmap='gray')
-    ax[2].imshow(recon_full, cmap='gray')
-    
-    for axis in ax:
-      axis.axis('off')

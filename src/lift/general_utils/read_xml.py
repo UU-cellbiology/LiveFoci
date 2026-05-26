@@ -1,5 +1,4 @@
 import numpy as np
-from pathlib import Path
 from xml.dom import minidom 
 import re
 
