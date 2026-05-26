@@ -15,6 +15,8 @@ from torchvision.transforms import functional as TF
 
 
 def get_kernel(scale, base_kernel=torch.tensor([1 / 16, 1 / 4, 3 / 8, 1 / 4, 1 / 16])):
+    import torch
+    import torch.nn.functional as F
     device = "cpu"  # torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     non_zero_idx = np.arange(0, torch.numel(base_kernel), 1) * scale
@@ -27,6 +29,8 @@ def get_kernel(scale, base_kernel=torch.tensor([1 / 16, 1 / 4, 3 / 8, 1 / 4, 1 /
 
 
 def get_scale_k(image, k):
+    import torch
+    import torch.nn.functional as F
 
     kernel = get_kernel(k)
     ps = kernel.shape[-1] // 2
@@ -38,6 +42,7 @@ def get_scale_k(image, k):
 
 
 def wavelets(img, scales=3):
+    import torch
     img = torch.tensor(img).unsqueeze(0).to("cpu").float()
 
     W, I = [], []

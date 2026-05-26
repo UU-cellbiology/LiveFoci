@@ -102,6 +102,12 @@ def _require_elastix():
         install_name="itk-elastix",
     )
 
+def _require_torch():
+    return _require(
+        "torch", "wavelets", "Wavelet filtering",
+        min_version=(1, 9),
+        install_name="torch",
+    )
 
 # ── auto-detection helpers ────────────────────────────────────────────────────
 
