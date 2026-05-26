@@ -1,5 +1,4 @@
 from pathlib import Path
-import tempfile
 import numpy as np
 import skimage
 from pystackreg import StackReg

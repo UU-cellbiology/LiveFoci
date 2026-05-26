@@ -7,7 +7,6 @@ import subprocess
 from tifffile import imread
 from xml.dom import minidom
 
-
 #####
 #
 # below are the helper functions to run the different tracking algorithms on the .tif files and save the resulting output

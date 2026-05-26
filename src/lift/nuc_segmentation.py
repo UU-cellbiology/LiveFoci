@@ -117,7 +117,7 @@ class CP_SAM(object):
             img_list = [skimage.transform.rescale(img, self.scale, order=1) for img in img_list]
         
         # segment the nuclei    
-        masks, flows, styles = self.cpsam.eval(img_list, batch_size=self.bs, flow_threshold=self.fT, 
+        masks, _, _ = self.cpsam.eval(img_list, batch_size=self.bs, flow_threshold=self.fT, 
                                           cellprob_threshold=self.cT, normalize={"tile_norm_blocksize": self.tnb})
 
         if self.scale != 1:
@@ -154,7 +154,7 @@ class CP_V3(object):
     def segment(self, img_list):
 
         # segment the nuclei    
-        masks, flows, styles = self.cp.eval(img_list, flow_threshold=self.fT, cellprob_threshold=self.cT,
+        masks, _, _ = self.cp.eval(img_list, flow_threshold=self.fT, cellprob_threshold=self.cT,
                                           diameter=self.diam, channels="Grayscale", normalize=True)
 
         return masks
