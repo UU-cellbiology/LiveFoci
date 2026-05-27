@@ -27,7 +27,7 @@ The pipeline runs in seven sequential steps:
 
 ---
 
-## Three ways to run LiFT
+## Four ways to run LiFT
 
 ### 1. Interactive GUI — `LiFT_app.py`
 
@@ -72,6 +72,80 @@ LiFT.run("data/")
 # or specific steps only by adding: steps=[1, 2, 5, 6]
 ```
 
+---
+ 
+### 4. Python API
+ 
+Every pipeline step is available as a Python function. Parameters can come from `parameters.yml` or be passed explicitly — explicit arguments always win over config.
+ 
+```python
+import lift
+ 
+# run the full pipeline from config
+lift.run("data/experiment_name")
+lift.run("data/experiment_name", steps=[1, 2, 5, 6])
+ 
+# or call individual steps
+lift.segment("data/experiment_name")
+lift.segment("data/experiment_name", method="cellpose_v3", diameter=120, min_area=500)
+ 
+lift.track_nuclei("data/experiment_name")
+lift.track_nuclei("data/experiment_name", method="IOU", min_length=15)
+ 
+lift.crop("data/experiment_name", margin=50)
+ 
+lift.register("data/experiment_name")
+lift.register("data/experiment_name", method="stackreg")
+ 
+lift.detect("data/experiment_name")
+lift.detect("data/experiment_name", method="TopHat", threshold=36, sigma=0.6, radius=3.0)
+ 
+lift.track_foci("data/experiment_name")
+lift.track_foci("data/experiment_name", method="GNN", max_distance=8.0, gap_closing=3)
+```
+ 
+---
+
+## CLI reference
+ 
+```
+lift info                                         # show installed optional packages
+lift init [data_path]                             # generate parameters.yml (default: cwd)
+lift config [data_path] [key.path=value ...]      # interactive editor or set values directly
+lift run <data_path> [--steps N ...]              # run pipeline
+lift <data_path> [--steps N ...]                  # shorthand for lift run
+```
+ 
+### `lift init`
+ 
+Probes your environment for installed optional packages and writes a `parameters.yml` with the best available defaults, also checks currently installed packages and inserts these as options:
+ 
+```bash
+lift init                          # writes to current directory
+lift init data/experiment_name     # writes to specified path
+```
+ 
+### `lift config`
+ 
+With no arguments, opens an interactive editor that walks through every parameter step by step, showing the current value and available options. Press Enter to keep a value unchanged, or type a new one. Ctrl+C saves what has been changed so far and exits.
+ 
+```bash
+lift config                        # interactive editor in current directory
+lift config data/experiment_name   # interactive editor at path
+```
+ 
+To set values directly without the interactive editor:
+ 
+```bash
+lift config step5_detection.threshold=40
+lift config step5_detection.method=TopHat step5_detection.params.radius=3.0
+lift config step1_segmentation.segmentation.min_area=500
+lift config step4_registration.preprocessing=null
+lift config data/experiment_name step5_detection.threshold=40
+```
+ 
+With no `key=value` arguments, prints the current config.
+ 
 ---
 
 ## Parameter reproducibility
