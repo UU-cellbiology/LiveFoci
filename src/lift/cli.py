@@ -228,6 +228,27 @@ def init(data_path: str = None):
     print(f"   foci tracking: {foci_tracker}")
     print("─────────────────────────────────────────────────────────────\n")
 
+def info():
+    """Print installed LiFT-relevant packages and their versions."""
+    import importlib
+
+    packages = [
+        ("cellpose",   "cp-sam / cp-v3", "cellpose>=4.0 or cellpose>=3.0,<4.0"),
+        ("trackastra", "trackastra",      "trackastra>=0.2"),
+        ("spotiflow",  "spotiflow",       "spotiflow>=0.4"),
+        ("itk",        "elastix",         "itk-elastix>=5.3"),
+        ("torch",      "cp-sam/cp-v3",    "installed by cellpose"),
+    ]
+
+    print("\n── LiFT environment ─────────────────────────────────────────")
+    for package, extra, note in packages:
+        try:
+            mod = importlib.import_module(package)
+            v   = getattr(mod, "__version__", "unknown version")
+            print(f"   ✓  {package:<16} {v:<12}  [{extra}]")
+        except ImportError:
+            print(f"   ✗  {package:<16} not installed   pip install \"LiFT[{extra}]\"")
+    print("─────────────────────────────────────────────────────────────\n")
 
 def config_cmd(data_path: str = None, sets: list = None):
     """
@@ -421,7 +442,7 @@ def main():
     import argparse
     import sys
 
-    known_commands = {"run", "init", "config"}
+    known_commands = {"run", "init", "config", "info"}
     if len(sys.argv) < 2 or sys.argv[1] not in known_commands:
         parser = argparse.ArgumentParser(description="LiFT – Live Foci Tracking pipeline")
         parser.add_argument("data_path")
@@ -453,6 +474,8 @@ def main():
         help="One or more key.path=value pairs to set. Omit to print current config."
     )
 
+    info_p = sub.add_parser("info", help="Show information about installed LiFT components")
+
     args = parser.parse_args()
 
     if args.command == "run":
@@ -461,3 +484,5 @@ def main():
         init(args.data_path)
     elif args.command == "config":
         config_cmd(args.data_path, args.sets)
+    elif args.command == "info":
+        info()
