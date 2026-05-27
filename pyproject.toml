@@ -21,6 +21,7 @@ dependencies = [
     "pystackreg>=0.2.7",
     "roifile>=2023.1",
     "networkx>=3.0",
+    "torch>=1.9"
 ]
 
 [project.optional-dependencies]
