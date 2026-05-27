@@ -119,19 +119,154 @@ def run(data_path: str, steps: list = None):
 
     print("Done.")
 
+def init(data_path: str):
+    """
+    Generate a parameters.yml in data_path based on what is installed.
+    Methods requiring uninstalled packages are noted in comments.
+    """
+    from lift._helpers import _probe_version
+    from lift.general_utils.params_utils import yaml_path, save_section
+    from pathlib import Path
+    import yaml
+
+    data_path = Path(data_path).resolve()
+    data_path.mkdir(parents=True, exist_ok=True)
+
+    out = yaml_path(data_path)
+    if out.exists():
+        print(f"parameters.yml already exists at {out} — skipping.")
+        return
+
+    # ── probe installed packages ──────────────────────────────────────────────
+    cellpose_v = _probe_version("cellpose")
+    has_cp_sam      = cellpose_v is not None and cellpose_v >= (4, 0)
+    has_cp_v3       = cellpose_v is not None and (3, 0) <= cellpose_v < (4, 0)
+    has_trackastra  = _probe_version("trackastra") is not None
+    has_spotiflow   = _probe_version("spotiflow")  is not None
+    has_elastix     = _probe_version("itk")        is not None
+
+    # ── pick best available defaults ──────────────────────────────────────────
+    if has_cp_sam:
+        seg_method = "cellpose_sam"
+    elif has_cp_v3:
+        seg_method = "cellpose_v3"
+    else:
+        seg_method = None
+
+    nuc_tracker   = "trackastra" if has_trackastra else "IOU"
+    foci_detector = "Spotiflow"  if has_spotiflow  else "Wavelets"
+    foci_tracker  = "trackastra" if has_trackastra else "GNN"
+    reg_method    = "elastix"    if has_elastix    else "stackreg"
+
+    # ── build the config dict ─────────────────────────────────────────────────
+    config = {}
+
+    # step 1
+    if seg_method:
+        config["step1_segmentation"] = {
+            "segmentation": {
+                "method":             seg_method,
+                "flow_threshold":     0.0,
+                "cellprob_threshold": -0.5,
+                "min_area":           1000,
+                "cellpose_sam":       {"scale_factor": 1},
+                "cellpose_v3":        {"diameter": 140},
+            },
+            "preprocessing": {
+                "method": None,
+                "wavelet_filtering": {"scales": 5, "w_factor": 1.5, "start_scale": 2},
+                "contrast_adjuster": {"sigma": 3.0, "c_factor": 6.0},
+            },
+        }
+
+    # step 2
+    config["step2_tracking"] = {
+        "method":     nuc_tracker,
+        "min_length": 20,
+        "IOU":        {"iou_min": 0.01},
+        "NND":        {"max_distance": 30.0, "gap_closing": 0},
+        "trackastra": {"remove_gaps": True},
+    }
+
+    # step 3
+    config["step3_cropping"] = {"margin": 30}
+
+    # step 4
+    config["step4_registration"] = {
+        "method":        reg_method,
+        "preprocessing": None,
+        "elastix":       {"loss": "MSE"},
+    }
+
+    # step 5
+    config["step5_detection"] = {
+        "method":              foci_detector,
+        "threshold":           None,   # None = use per-method default
+        "return_segmentation": False,
+        "params":              {},
+    }
+
+    # step 6
+    config["step6_tracking"] = {
+        "method":           foci_tracker,
+        "min_track_length": 3,
+        "GNN":              {"max_distance": 5.0, "gap_closing": 2},
+        "NGMA":             {"max_distance": 5.0, "gap_closing": 2},
+        "trackastra":       {"use_segmentation": True},
+    }
+
+    # ── write yaml ────────────────────────────────────────────────────────────
+    with open(out, "w") as f:
+        yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+
+    # ── print summary ─────────────────────────────────────────────────────────
+    print(f"\nGenerated parameters.yml at {out}\n")
+    print("── installed packages detected ──────────────────────────────")
+    print(f"   cellpose-SAM  (cp-sam):   {'✓' if has_cp_sam     else '✗  pip install \"LiFT[cp-sam]\"'}")
+    print(f"   cellpose-v3   (cp-v3):    {'✓' if has_cp_v3      else '✗  pip install \"LiFT[cp-v3]\"'}")
+    print(f"   trackastra:               {'✓' if has_trackastra else '✗  pip install \"LiFT[trackastra]\"'}")
+    print(f"   spotiflow:                {'✓' if has_spotiflow  else '✗  pip install \"LiFT[spotiflow]\"'}")
+    print(f"   itk-elastix:              {'✓' if has_elastix    else '✗  pip install \"LiFT[elastix]\"'}")
+    print("─────────────────────────────────────────────────────────────")
+    print(f"\n── defaults written ─────────────────────────────────────────")
+    print(f"   segmentation:  {seg_method or 'none — install cp-sam or cp-v3'}")
+    print(f"   nuc tracking:  {nuc_tracker}")
+    print(f"   registration:  {reg_method}")
+    print(f"   foci detector: {foci_detector}")
+    print(f"   foci tracking: {foci_tracker}")
+    print("─────────────────────────────────────────────────────────────\n")
+
 
 def main():
     import argparse
+
     parser = argparse.ArgumentParser(
-        description="Run LiFT pipeline from parameters.yml"
+        description="LiFT – Live Foci Tracking pipeline"
     )
-    parser.add_argument(
-        'data_path',
-        help="Path to the data folder containing parameters.yml"
+    sub = parser.add_subparsers(dest="command")
+
+    # lift run <data_path>
+    run_p = sub.add_parser("run", help="Run pipeline from parameters.yml")
+    run_p.add_argument("data_path", help="Path to data folder")
+    run_p.add_argument(
+        "--steps", nargs="+", type=int, metavar="N",
+        help="Steps to run, e.g. --steps 1 2 5"
     )
-    parser.add_argument(
-        '--steps', nargs='+', type=int, metavar='N',
-        help="Step numbers to run (default: all). E.g. --steps 5 6"
-    )
+
+    # lift init <data_path>
+    init_p = sub.add_parser("init", help="Generate parameters.yml from installed packages")
+    init_p.add_argument("data_path", help="Path to write parameters.yml into")
+
     args = parser.parse_args()
-    run(args.data_path, steps=args.steps)
+
+    if args.command == "run":
+        run(args.data_path, steps=args.steps)
+    elif args.command == "init":
+        init(args.data_path)
+    else:
+        # no subcommand — preserve old behaviour so `lift data/` still works
+        parser2 = argparse.ArgumentParser()
+        parser2.add_argument("data_path")
+        parser2.add_argument("--steps", nargs="+", type=int, metavar="N")
+        args2 = parser2.parse_args()
+        run(args2.data_path, steps=args2.steps)
