@@ -78,28 +78,18 @@ def stackreg_registration(stack, preproc_func=None):
 
     registered_stack = np.clip(to_uint16(registered_stack), 0, 255).astype(np.uint8)
     return registered_stack
-
-
 class ElastixReg:
     """
-    ITK-Elastix based image registration — cross-platform pure-Python replacement
-    for the old elastix.exe subprocess approach.
-
-    Install the optional dependency with:
-        pip install "LiFT[elastix]"
+    ITK-Elastix based image registration.
+    Install with: pip install "LiFT[elastix]"
 
     Parameters
     ----------
     loss : "MSE" | "MI" | "NCC"
-        Similarity metric. Selects the matching parameter file from elastix_params/.
     preprocess_function : callable | None
-        Applied to the full stack before computing transforms. The raw stack
-        is always used for the actual transformation.
     previous_initialisation : bool
-        Initialise each frame's registration from the previous transform.
     """
 
-    # parameter files shipped with the package
     _PARAMS_DIR = Path(__file__).resolve().parent / "elastix_params"
 
     def __init__(self, loss='MSE', preprocess_function=None, previous_initialisation=True):
@@ -107,6 +97,7 @@ class ElastixReg:
         _require_elastix()
         import itk
 
+        self._itk             = itk
         self.loss             = loss
         self.preproc_function = preprocess_function
         self.prev_init        = previous_initialisation
@@ -120,27 +111,37 @@ class ElastixReg:
         if not self._param_file.exists():
             raise FileNotFoundError(
                 f"Elastix parameter file not found: {self._param_file}\n"
-                f"Available files: {list(self._PARAMS_DIR.glob('*.txt'))}"
+                f"Available: {list(self._PARAMS_DIR.glob('*.txt'))}"
             )
 
     def _to_itk(self, arr):
-        """Convert a 2-D numpy array to an ITK image."""
         return self._itk.GetImageFromArray(arr.astype(np.float32))
 
+    def _is_empty(self, arr):
+        return arr.sum() == 0
+
     def _register_pair(self, fixed_arr, moving_arr,
-                       fixed_proc=None, moving_proc=None,
-                       initial_transform=None):
-        """
-        Register one moving frame to one fixed frame.
-        Returns (registered_array, result_transform).
-        """
+                    fixed_proc=None, moving_proc=None,
+                    initial_transform=None):
         itk = self._itk
+
+        if self._is_empty(fixed_arr) or self._is_empty(moving_arr):
+            return moving_arr.copy(), initial_transform
 
         fixed_img  = self._to_itk(fixed_arr)
         moving_img = self._to_itk(moving_arr)
 
         param_obj = itk.ParameterObject.New()
         param_obj.ReadParameterFile(str(self._param_file))
+
+        # adapt parameters to image size — small crops need fewer resolution levels
+        # and more tolerance for samples mapping outside the image
+        h, w = fixed_arr.shape
+        min_dim = min(h, w)
+        n_resolutions = 1 if min_dim < 32 else (2 if min_dim < 64 else 4)
+
+        param_obj.SetParameter("NumberOfResolutions",          str(n_resolutions))
+        param_obj.SetParameter("RequiredRatioOfValidSamples",  "0.05")   # default is 0.25, lower = more tolerant
 
         reg = itk.ElastixRegistrationMethod.New(fixed_img, moving_img)
         reg.SetParameterObject(param_obj)
@@ -153,25 +154,27 @@ class ElastixReg:
             reg.SetInitialTransformParameterObject(initial_transform)
 
         reg.SetLogToConsole(False)
-        reg.Update()
 
-        result      = np.array(itk.GetArrayFromImage(reg.GetOutput()))
-        transform   = reg.GetTransformParameterObject()
+        try:
+            reg.Update()
+        except RuntimeError:
+            # if registration still fails, return moving unregistered rather than crashing
+            return moving_arr.copy(), initial_transform
+
+        result    = np.array(itk.GetArrayFromImage(reg.GetOutput()))
+        transform = reg.GetTransformParameterObject()
+
         return result, transform
 
     def register_stack(self, img_stack):
-        """
-        Register all frames in img_stack to the previous frame.
+        from tqdm import tqdm
 
-        Returns a uint8 array of the same shape as img_stack.
-        """
         processed_stack = self.preproc_function(img_stack) if self.preproc_function else None
+        registered      = [img_stack[0].copy()]
+        prev_transform  = None
 
-        registered = [img_stack[0].copy()]
-        prev_transform = None
-
-        for tt in range(len(img_stack) - 1):
-            fixed_arr  = registered[-1]   # always register to the last registered frame
+        for tt in tqdm(range(len(img_stack) - 1), desc="registering frames"):
+            fixed_arr  = registered[-1]
             moving_arr = img_stack[tt + 1]
 
             fixed_proc  = (self.preproc_function([fixed_arr])[0]
@@ -181,11 +184,10 @@ class ElastixReg:
 
             result, prev_transform = self._register_pair(
                 fixed_arr, moving_arr,
-                fixed_proc=fixed_proc,
-                moving_proc=moving_proc,
-                initial_transform=prev_transform if self.prev_init else None,
+                fixed_proc  = fixed_proc,
+                moving_proc = moving_proc,
+                initial_transform = prev_transform if self.prev_init else None,
             )
-
             registered.append(result)
 
         registered = np.stack(registered)

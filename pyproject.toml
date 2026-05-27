@@ -29,7 +29,7 @@ cp-sam     = ["cellpose>=4.0"]
 cp-v3      = ["cellpose>=3.0,<4.0"]
 trackastra = ["trackastra>=0.2"]
 spotiflow  = ["spotiflow>=0.4"]
-elastix    = ["itk-elastix>=5.3"]
+elastix    = ["itk-elastix>=0.19"]
 notebook   = ["jupyter"]
 app        = ["flask>=3.0"]
 

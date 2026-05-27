@@ -62,10 +62,17 @@ def _require(package, extra, what, min_version=None, max_version=None, install_n
 def _probe_version(package):
     """Return (major, minor) tuple for an installed package, or None if absent."""
     try:
-        mod = importlib.import_module(package)
-        raw = getattr(mod, "__version__", "")
+        from importlib.metadata import version, PackageNotFoundError
+        # metadata name may differ from import name e.g. "itk-elastix" vs "itk"
+        _METADATA_NAMES = {
+            "itk":       "itk-elastix",
+            "skimage":   "scikit-image",
+            "cv2":       "opencv-python",
+        }
+        meta_name = _METADATA_NAMES.get(package, package)
+        raw = version(meta_name)
         return tuple(int(x) for x in raw.split(".")[:2] if x.isdigit())
-    except ImportError:
+    except Exception:
         return None
 
 
@@ -98,7 +105,7 @@ def _require_spotiflow():
 def _require_elastix():
     return _require(
         "itk", "elastix", "Elastix registration",
-        min_version=(5, 3),
+        min_version=(0, 19),
         install_name="itk-elastix",
     )
 
