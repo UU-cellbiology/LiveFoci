@@ -357,14 +357,14 @@ class NGMA_track(object):
         self.base_dir =  Path(__file__).parent.resolve()  #Path.cwd()  
 
         if os.name == "nt":  # command for windows
-            self.java = self.base_dir / "tracker_utils" / "ImageJ" / "jre" / "bin" / "java.exe"
+            self.java = self.base_dir / "NGMA_utils" / "ImageJ" / "jre" / "bin" / "java.exe"
             self.classpath_sep = ";"
         else:  # command for other systems
-            self.java = self.base_dir / "tracker_utils" / "ImageJ" / "jre" / "bin" / "java"
+            self.java = self.base_dir / "NGMA_utils" / "ImageJ" / "jre" / "bin" / "java"
             self.classpath_sep = ":"
                             
         # location of the java tracking plugin
-        self.TP_dir = self.base_dir / "tracker_utils" / "SOSTracker commandline"
+        self.TP_dir = self.base_dir / "NGMA_utils" / "SOSTracker commandline"
 
         # Classpath jars
         jars = ["VENI_.jar", "ij.jar", "imagescience.jar", "Jama-1.0.2.jar"]
@@ -462,7 +462,7 @@ class NGMA_track(object):
         # get timepoints with detections
         timepoints = np.unique(detections[:,2]).astype(int)
         
-        # looks for gaps with no detecionts
+        # looks for gaps with no detections
         missing_mask = np.ones(num_frames, dtype=bool)
         missing_mask[timepoints] = False
         missing_t = np.where(missing_mask)[0]
@@ -475,7 +475,7 @@ class NGMA_track(object):
         for g in groups:
             gap_length = len(g)
             
-            # number of fake detecionts to insert
+            # number of fake detections to insert
             n_fake = gap_length // insert_gap
             if n_fake > 0:
                 # correctly space frames inside gap
