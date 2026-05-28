@@ -1,0 +1,27 @@
+(CenterOfRotationPoint 79.25533043291945 79.88369261855196)
+(Direction 1 0 0 1)
+(FixedImageDimension 2)
+(FixedInternalImagePixelType "float")
+(HowToCombineTransforms "Compose")
+(Index 0 0)
+(InitialTransformParameterFileName "C:\Users\084011\Documents\projects\live_cell_foci_analysis\pipeline\utils_elastix\Temp\prev_transforms\TransformParameters.17.txt")
+(MovingImageDimension 2)
+(MovingInternalImagePixelType "float")
+(NumberOfParameters 3)
+(Origin 0 0)
+(Size 154 154)
+(Spacing 1.0000000150184933 1.0000000150184933)
+(Transform "EulerTransform")
+(TransformParameters -0.058025754219184614 -1.5278969072125266 -0.5576346309841712)
+(UseDirectionCosines "true")
+
+// ResampleInterpolator specific
+(FinalBSplineInterpolationOrder 3)
+(ResampleInterpolator "FinalBSplineInterpolator")
+
+// Resampler specific
+(CompressResultImage "false")
+(DefaultPixelValue 0)
+(Resampler "DefaultResampler")
+(ResultImageFormat "tif")
+(ResultImagePixelType "short")
