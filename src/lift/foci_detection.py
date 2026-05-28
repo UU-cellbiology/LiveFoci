@@ -260,8 +260,6 @@ class WaveletDetector(BaseDetector):
     start_scale : first scale included in reconstruction
     """
     name              = "Wavelets"
-    default_params    = {"K": 3, "factor": 4.0, "start_scale": 0}
-    default_threshold = 30
 
     def enhance(self, image):
         K           = self.params["K"]
@@ -288,8 +286,6 @@ class LOGDetector(BaseDetector):
     sigma : sigma for the LoG filter
     """
     name              = "LOG"
-    default_params    = {"sigma": 0.8}
-    default_threshold = 26
 
     def enhance(self, image):
         image = image.astype(np.float32)
@@ -304,8 +300,6 @@ class HessianDetector(BaseDetector):
     sigma : sigma for Gaussian blurring before Hessian computation
     """
     name              = "Hessian"
-    default_params    = {"sigma": 0.5}
-    default_threshold = 5
 
     def enhance(self, image):
         image = image.astype(np.float32)
@@ -328,8 +322,6 @@ class TopHatDetector(BaseDetector):
     radius : radius of the disk-shaped structuring element
     """
     name              = "TopHat"
-    default_params    = {"sigma": 0.6, "radius": 2.0}
-    default_threshold = 26
 
     def enhance(self, image):
         image  = image.astype(np.float32)
@@ -346,8 +338,6 @@ class HDomeDetector(BaseDetector):
     h : height of the h-dome — regional maxima shorter than h are suppressed
     """
     name              = "HDome"
-    default_params    = {"h": 50}
-    default_threshold = 40
 
     def enhance(self, image):
         image = image.astype(np.float32)
@@ -366,8 +356,6 @@ class HDomeSmalDetector(BaseDetector):
     s     : exponent applied to the output
     """
     name              = "HDome-smal"
-    default_params    = {"sigma": 1.2, "h": 80, "s": 1.5}
-    default_threshold = 20
 
     def enhance(self, image):
         h     = self.params["h"]
@@ -395,8 +383,6 @@ class MPHDDetector(BaseDetector):
     R      : search radius in pixels for adaptive height estimation
     """
     name              = "MPHD"
-    default_params    = {"sigma": 0.5, "h_init": 5, "R": 10}
-    default_threshold = 20
 
     def enhance(self, image):
         h_init = self.params["h_init"]
@@ -448,8 +434,6 @@ class SpotiflowDetector(BaseDetector):
     model_name : pretrained model to use (default "general")
     """
     name              = "Spotiflow"
-    default_params    = {"model_name": "general"}
-    default_threshold = 0.55
 
     def __init__(self, **params):
         from lift._helpers import _require_spotiflow
