@@ -53,6 +53,8 @@ jupyter notebook LiFT_notebook.ipynb
 
 ### 3. Command-line runner — `LiFT.py`
 
+For this method, you can simply clone the entire repository and execute from that local directory. 
+
 Reads the `parameters.yml` written by the GUI or notebook and re-runs the full pipeline on a new data folder with identical settings. More experienced users can also write a custom `parameters.yml` with their desired settings. Intended for batch reproduction and HPC submission.
 
 ```bash
@@ -74,8 +76,14 @@ LiFT.run("data/")
 
 ---
  
-### 4. Python API
- 
+### 4. Python Package
+
+LiFT is also distributed as a Python package, leading to it being available in your codebase after installing it from PyPi.
+
+```bash
+pip install lift-foci
+```
+
 Every pipeline step is available as a Python function. Parameters can come from `parameters.yml` or be passed explicitly — explicit arguments always win over config.
  
 ```python
