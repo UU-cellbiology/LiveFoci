@@ -212,13 +212,19 @@ def init(data_path: str = None):
     with open(out, "w") as f:
         yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
+    cp_sam_str     = '✓' if has_cp_sam     else '✗  pip install "LiFT[cp-sam]"'
+    cp_v3_str      = '✓' if has_cp_v3      else '✗  pip install "LiFT[cp-v3]"'
+    trackastra_str = '✓' if has_trackastra else '✗  pip install "LiFT[trackastra]"'
+    spotiflow_str  = '✓' if has_spotiflow  else '✗  pip install "LiFT[spotiflow]"'
+    elastix_str    = '✓' if has_elastix    else '✗  pip install "LiFT[elastix]"'
+
     print(f"\nGenerated parameters.yml at {out}\n")
     print("── installed packages detected ──────────────────────────────")
-    print(f"   cellpose-SAM  (cp-sam):   {'✓' if has_cp_sam     else '✗  pip install \"LiFT[cp-sam]\"'}")
-    print(f"   cellpose-v3   (cp-v3):    {'✓' if has_cp_v3      else '✗  pip install \"LiFT[cp-v3]\"'}")
-    print(f"   trackastra:               {'✓' if has_trackastra else '✗  pip install \"LiFT[trackastra]\"'}")
-    print(f"   spotiflow:                {'✓' if has_spotiflow  else '✗  pip install \"LiFT[spotiflow]\"'}")
-    print(f"   itk-elastix:              {'✓' if has_elastix    else '✗  pip install \"LiFT[elastix]\"'}")
+    print(f"   cellpose-SAM  (cp-sam):   {cp_sam_str}")
+    print(f"   cellpose-v3   (cp-v3):    {cp_v3_str}")
+    print(f"   trackastra:               {trackastra_str}")
+    print(f"   spotiflow:                {spotiflow_str}")
+    print(f"   itk-elastix:              {elastix_str}")
     print("─────────────────────────────────────────────────────────────")
     print(f"\n── defaults written ─────────────────────────────────────────")
     print(f"   segmentation:  {seg_method or 'none — install cp-sam or cp-v3'}")

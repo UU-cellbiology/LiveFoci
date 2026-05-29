@@ -16,9 +16,9 @@ import matplotlib.pyplot as plt
 # Make sure the project root is importable
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from pipeline import nuc_segmentation, nuclei_trackers, cut_out_cells, registration, foci_detection, foci_trackers
-from pipeline.general_utils import load_sequence, plt_figures
-from pipeline.general_utils.params_utils import (
+from src.lift import nuc_segmentation, nuclei_trackers, cut_out_cells, registration, foci_detection, foci_trackers
+from src.lift.general_utils import load_sequence, plt_figures
+from src.lift.general_utils.params_utils import (
     save_segmentation_params, save_tracking_params, save_cropping_params,
     save_registration_params, save_detection_params, save_foci_tracking_params,
 )
@@ -985,8 +985,8 @@ def discover_conditions():
 
 @app.route('/api/generate_plots', methods=['POST'])
 def generate_plots():
-    from pipeline.general_utils import plot_utils
-    from pipeline.general_utils.read_xml import extract_tracking_info
+    from src.lift.general_utils import plot_utils
+    from src.lift.general_utils.read_xml import extract_tracking_info
 
     data         = request.get_json()
     data_path    = Path(data.get('data_path', DEFAULT_DATA_PATH))
@@ -1073,8 +1073,8 @@ def generate_plots():
 
 @app.route('/api/run_stats', methods=['POST'])
 def run_stats():
-    from pipeline.general_utils import plot_utils
-    from pipeline.general_utils.read_xml import extract_tracking_info
+    from src.lift.general_utils import plot_utils
+    from src.lift.general_utils.read_xml import extract_tracking_info
 
     data         = request.get_json()
     data_path    = Path(data.get('data_path', DEFAULT_DATA_PATH))

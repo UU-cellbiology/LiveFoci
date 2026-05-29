@@ -70,53 +70,107 @@ def run_detection(path_list, detector, threshold, return_segmentation=False):
 #####
 
 
-def create_detector(name=None, params=None, threshold=None):
-    """
-    Create a detector by name, merging provided params with class defaults.
-    If name is None, auto-detects the best available method.
-    """
-    if name is None:
-        from lift._helpers import _detect_foci_detector
-        name = _detect_foci_detector()
+#####
+#
+# below is the helper function to load different detectors and the variable containing
+# the default parameters for each detector
+#
+#####
 
-    # registry builds itself from BaseDetector subclasses
-    registry = {
-        cls.name: cls
-        for cls in _all_subclasses(BaseDetector)
-        if cls.name != "base"
+def create_detector(name, params=None, threshold=None):
+    """
+    Helper function to create the different detectors based on the provided name
+    and load the default parameters or use the parameters provided in this function
+    """
+
+    DETECTOR_REGISTRY = {
+        "Wavelets": {
+            "class": WaveletDetector,
+            "default_params": {
+                "K": 3,
+                "factor": 4.0,
+                "start_scale": 0
+            },
+            "default_threshold": 30
+        },
+        "LOG": {
+            "class": LOGDetector,
+            "default_params": {
+                "sigma": 0.8
+            },
+            "default_threshold": 26
+        },
+        "Hessian": {
+            "class": HessianDetector,
+            "default_params": {
+                "sigma": 0.5
+            },
+            "default_threshold": 5
+        },
+        "TopHat": {
+            "class": TopHatDetector,
+            "default_params": {
+                "sigma": 0.6,
+                "radius": 2.0
+            },
+            "default_threshold": 26
+        },
+        "HDome": {
+            "class": HDomeDetector,
+            "default_params": {
+                "h": 50
+            },
+            "default_threshold": 40
+        },
+        "HDome-smal": {
+            "class": HDomeSmalDetector,
+            "default_params": {
+                "sigma": 1.2,
+                "h": 80,
+                "s": 1.5
+            },
+            "default_threshold": 20
+        },
+        "MPHD": {
+            "class": MPHDDetector,
+            "default_params": {
+                "sigma": 0.5,
+                "h_init": 5,
+                "R": 10
+            },
+            "default_threshold": 20
+        },
+        "Spotiflow": {
+            "class": SpotiflowDetector,
+            "default_params": {
+                "model_name": "general"
+            },
+            "default_threshold": 0.55
+        }
     }
+    
 
-    if name not in registry:
-        raise ValueError(
-            f"Unknown detector: {name!r}\n"
-            f"Available: {sorted(registry)}"
-        )
+    config = DETECTOR_REGISTRY[name]
 
-    cls           = registry[name]
-    merged_params = {**cls.default_params, **(params or {})}
+    DetectorClass = config["class"]
+
+    default_params = config["default_params"].copy()
+
+    if params:
+        default_params.update(params)
+
     if threshold is None:
-        threshold = cls.default_threshold
+        threshold = config["default_threshold"]
 
-    print(f"── foci detection method:    {name}")
-    print(f"── detection threshold:      {threshold}")
-    print(f"── detection params:         {merged_params}")
+    detector = DetectorClass(**default_params)
 
-    return cls(**merged_params), threshold
-
-
-def _all_subclasses(cls):
-    """Recursively collect all subclasses."""
-    for sub in cls.__subclasses__():
-        yield sub
-        yield from _all_subclasses(sub)
-
+    return detector, threshold
 
 #####
 #
 # coordinate extraction helpers
 #
 #####
-
 
 def H_dome_transform(image, h):
     """Suppress all regional maxima with height less than h."""
@@ -206,8 +260,6 @@ class WaveletDetector(BaseDetector):
     start_scale : first scale included in reconstruction
     """
     name              = "Wavelets"
-    default_params    = {"K": 3, "factor": 4.0, "start_scale": 0}
-    default_threshold = 30
 
     def enhance(self, image):
         K           = self.params["K"]
@@ -234,8 +286,6 @@ class LOGDetector(BaseDetector):
     sigma : sigma for the LoG filter
     """
     name              = "LOG"
-    default_params    = {"sigma": 0.8}
-    default_threshold = 26
 
     def enhance(self, image):
         image = image.astype(np.float32)
@@ -250,8 +300,6 @@ class HessianDetector(BaseDetector):
     sigma : sigma for Gaussian blurring before Hessian computation
     """
     name              = "Hessian"
-    default_params    = {"sigma": 0.5}
-    default_threshold = 5
 
     def enhance(self, image):
         image = image.astype(np.float32)
@@ -274,8 +322,6 @@ class TopHatDetector(BaseDetector):
     radius : radius of the disk-shaped structuring element
     """
     name              = "TopHat"
-    default_params    = {"sigma": 0.6, "radius": 2.0}
-    default_threshold = 26
 
     def enhance(self, image):
         image  = image.astype(np.float32)
@@ -292,8 +338,6 @@ class HDomeDetector(BaseDetector):
     h : height of the h-dome — regional maxima shorter than h are suppressed
     """
     name              = "HDome"
-    default_params    = {"h": 50}
-    default_threshold = 40
 
     def enhance(self, image):
         image = image.astype(np.float32)
@@ -312,8 +356,6 @@ class HDomeSmalDetector(BaseDetector):
     s     : exponent applied to the output
     """
     name              = "HDome-smal"
-    default_params    = {"sigma": 1.2, "h": 80, "s": 1.5}
-    default_threshold = 20
 
     def enhance(self, image):
         h     = self.params["h"]
@@ -341,8 +383,6 @@ class MPHDDetector(BaseDetector):
     R      : search radius in pixels for adaptive height estimation
     """
     name              = "MPHD"
-    default_params    = {"sigma": 0.5, "h_init": 5, "R": 10}
-    default_threshold = 20
 
     def enhance(self, image):
         h_init = self.params["h_init"]
@@ -394,8 +434,6 @@ class SpotiflowDetector(BaseDetector):
     model_name : pretrained model to use (default "general")
     """
     name              = "Spotiflow"
-    default_params    = {"model_name": "general"}
-    default_threshold = 0.55
 
     def __init__(self, **params):
         from lift._helpers import _require_spotiflow

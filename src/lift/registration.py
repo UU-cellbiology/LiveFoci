@@ -4,7 +4,7 @@ import skimage
 from pystackreg import StackReg
 from pystackreg.util import to_uint16
 from lift.general_utils.wavelet_filter import wavelets
-
+import subprocess
 
 #####
 #
@@ -78,120 +78,105 @@ def stackreg_registration(stack, preproc_func=None):
 
     registered_stack = np.clip(to_uint16(registered_stack), 0, 255).astype(np.uint8)
     return registered_stack
-class ElastixReg:
-    """
-    ITK-Elastix based image registration.
-    Install with: pip install "LiFT[elastix]"
 
-    Parameters
-    ----------
-    loss : "MSE" | "MI" | "NCC"
-    preprocess_function : callable | None
-    previous_initialisation : bool
-    """
-
-    _PARAMS_DIR = Path(__file__).resolve().parent / "elastix_params"
-
+class ElastixReg(object):
+    
     def __init__(self, loss='MSE', preprocess_function=None, previous_initialisation=True):
-        from lift._helpers import _require_elastix
-        _require_elastix()
-        import itk
-
-        self._itk             = itk
-        self.loss             = loss
+        super().__init__()
         self.preproc_function = preprocess_function
-        self.prev_init        = previous_initialisation
+        self.prev_init = previous_initialisation
+        
+        #get directory for this class
+        self.wd = Path(__file__).resolve().parent   # Path.cwd() 
+        elastix_dir = self.wd / "utils_elastix"
+        
+        self.elastix_bin = elastix_dir  / "elastix.exe"
+        self.param_loc = elastix_dir  / f"elastix_parameters_{loss}.txt"
+        self.out_dir = elastix_dir / "Temp"
 
-        self._param_file = self._PARAMS_DIR / (
-            f"elastix_parameters_MultiImage_{loss}.txt"
-            if preprocess_function
-            else f"elastix_parameters_{loss}.txt"
-        )
+        self.fixed = elastix_dir  / "Temp" / "fixed.tif"
+        self.moving = elastix_dir  / "Temp" / "moving.tif"  
 
-        if not self._param_file.exists():
-            raise FileNotFoundError(
-                f"Elastix parameter file not found: {self._param_file}\n"
-                f"Available: {list(self._PARAMS_DIR.glob('*.txt'))}"
-            )
+        self.transform_loc = self.out_dir / "prev_transforms"  # location for transform of previous frames for initialisation
+        
+        if self.preproc_function:  # change the command to support multi image registration
+            self.fixed_processed = elastix_dir  / "Temp" / "fixed_processed.tif"
+            self.moving_processed = elastix_dir  / "Temp" / "moving_processed.tif"
+            self.param_loc = elastix_dir  / f"elastix_parameters_MultiImage_{loss}.txt"
+            self.cmd = [
+                str(self.elastix_bin),
+                "-f0", str(self.fixed),
+                "-m0", str(self.moving),
+                "-f1", str(self.fixed_processed),
+                "-m1", str(self.moving_processed),
+                "-p", str(self.param_loc),
+                "-out", str(self.out_dir),
+            ]
+        else:    
+            self.cmd = [
+                str(self.elastix_bin),
+                "-f", str(self.fixed),
+                "-m", str(self.moving),
+                "-p", str(self.param_loc),
+                "-out", str(self.out_dir),
+            ]
 
-    def _to_itk(self, arr):
-        return self._itk.GetImageFromArray(arr.astype(np.float32))
+        self._validate_paths()
 
-    def _is_empty(self, arr):
-        return arr.sum() == 0
+    
+    def _validate_paths(self):
+        if not self.elastix_bin.exists():
+            raise FileNotFoundError(f"Elastix binary not found: {self.elastix_bin}")
 
-    def _register_pair(self, fixed_arr, moving_arr,
-                    fixed_proc=None, moving_proc=None,
-                    initial_transform=None):
-        itk = self._itk
-
-        if self._is_empty(fixed_arr) or self._is_empty(moving_arr):
-            return moving_arr.copy(), initial_transform
-
-        fixed_img  = self._to_itk(fixed_arr)
-        moving_img = self._to_itk(moving_arr)
-
-        param_obj = itk.ParameterObject.New()
-        param_obj.ReadParameterFile(str(self._param_file))
-
-        # adapt parameters to image size — small crops need fewer resolution levels
-        # and more tolerance for samples mapping outside the image
-        h, w = fixed_arr.shape
-        min_dim = min(h, w)
-        n_resolutions = 1 if min_dim < 32 else (2 if min_dim < 64 else 4)
-
-        param_obj.SetParameter("NumberOfResolutions",          str(n_resolutions))
-        param_obj.SetParameter("RequiredRatioOfValidSamples",  "0.05")   # default is 0.25, lower = more tolerant
-
-        reg = itk.ElastixRegistrationMethod.New(fixed_img, moving_img)
-        reg.SetParameterObject(param_obj)
-
-        if self.preproc_function and fixed_proc is not None:
-            reg.SetFixedImage(1,  self._to_itk(fixed_proc))
-            reg.SetMovingImage(1, self._to_itk(moving_proc))
-
-        if initial_transform is not None and self.prev_init:
-            reg.SetInitialTransformParameterObject(initial_transform)
-
-        reg.SetLogToConsole(False)
-
-        try:
-            reg.Update()
-        except RuntimeError:
-            # if registration still fails, return moving unregistered rather than crashing
-            return moving_arr.copy(), initial_transform
-
-        result    = np.array(itk.GetArrayFromImage(reg.GetOutput()))
-        transform = reg.GetTransformParameterObject()
-
-        return result, transform
-
+        if not self.param_loc.exists():
+            raise FileNotFoundError(f"Parameter file not found: {self.param_loc}")
+            
+    
     def register_stack(self, img_stack):
-        from tqdm import tqdm
 
-        processed_stack = self.preproc_function(img_stack) if self.preproc_function else None
-        registered      = [img_stack[0].copy()]
-        prev_transform  = None
+        elastix_reg = [img_stack[0].copy()]
+        skimage.io.imsave(self.fixed, elastix_reg[-1], check_contrast=False)
 
-        for tt in tqdm(range(len(img_stack) - 1), desc="registering frames"):
-            fixed_arr  = registered[-1]
-            moving_arr = img_stack[tt + 1]
+        if self.preproc_function:
+            processed_stack = self.preproc_function(img_stack)
+            skimage.io.imsave(self.fixed_processed, processed_stack[0], check_contrast=False)
+            skimage.io.imsave(self.moving_processed, processed_stack[1], check_contrast=False)  
 
-            fixed_proc  = (self.preproc_function([fixed_arr])[0]
-                           if self.preproc_function else None)
-            moving_proc = (processed_stack[tt + 1]
-                           if processed_stack is not None else None)
+        timepoints, nr, nc = img_stack.shape
+        for tt in range(timepoints-1):   
+            skimage.io.imsave(self.moving, img_stack[tt+1], check_contrast=False)
 
-            result, prev_transform = self._register_pair(
-                fixed_arr, moving_arr,
-                fixed_proc  = fixed_proc,
-                moving_proc = moving_proc,
-                initial_transform = prev_transform if self.prev_init else None,
-            )
-            registered.append(result)
+            if tt > 0 and self.prev_init:
+                prev_transform = self.transform_loc / f"TransformParameters.{tt-1}.txt"
+                (self.out_dir / "TransformParameters.0.txt").replace(prev_transform)
+                reg_command = self.cmd + ["-t0", str(prev_transform)]
+            else:
+                reg_command = self.cmd
+            
+            p = subprocess.run(reg_command, capture_output=False, text=True)
+            #print(p.stderr)
+            #print(p.stdout)
 
-        registered = np.stack(registered)
-        return np.clip(registered, 0, 255).astype(np.uint8)
+            registered_image = skimage.io.imread(self.out_dir / "result.0.tif")
+            elastix_reg.append(registered_image)
+
+            # update the fixed image using the registered result
+            (self.out_dir / "result.0.tif").replace(self.fixed)
+
+            # process the registered image again and update the temporary processed images
+            if self.preproc_function:  
+                processed_reg = wavelet_denoise([np.clip(registered_image, 0, 255).astype(np.uint8)])
+                skimage.io.imsave(self.fixed_processed, processed_reg, check_contrast=False)
+                skimage.io.imsave(self.moving_processed, processed_stack[tt+1], check_contrast=False)  
+        
+        elastix_reg = np.stack(elastix_reg)
+        elastix_reg = np.clip(elastix_reg, 0, 255).astype(np.uint8)
+
+        # remove the files of the previous transforms
+        for f in self.transform_loc.glob("TransformParameters.*.txt"):
+            f.unlink()
+
+        return elastix_reg
 
 
 #####

@@ -38,8 +38,6 @@ def run_tracker(path_list, method=None, min_length=20, **kwargs):
         from lift._helpers import _detect_nuclei_tracker
         method = _detect_nuclei_tracker()
 
-    print(f"nuclei tracking method:   {method}\n")
-
     if method == 'IOU':
         iou_min = kwargs.pop("iou_min", 0.01)
         tracker = IOU_tracker(min_track_length=min_length, iou_min=iou_min)
@@ -68,10 +66,10 @@ def run_tracker(path_list, method=None, min_length=20, **kwargs):
 
 class IOU_tracker(object):
     
-    def __init__(self, min_track_length=20, iou_min=0.01):
+    def __init__(self, min_track_length=1, iou_min=0.01):
         super().__init__()
 
-        self.iou_min = iou_min, 
+        self.iou_min = iou_min 
         self.min_track_length = min_track_length
 
 
@@ -80,7 +78,7 @@ class IOU_tracker(object):
         path = Path(path)
         segmentation_sequence = load_sequence.load(path)
 
-        tracked_sequence, track_info = self.iou_assignment(segmentation_sequence)            
+        tracked_sequence, track_info = self.iou_assignment(segmentation_sequence)       
         
         save_path = path.parent / "cell_tracking"
         save_path.mkdir(exist_ok=True)
@@ -262,14 +260,14 @@ class NND_tracker(object):
         self.base_dir =  Path(__file__).parent.resolve()  #Path.cwd()  #
 
         if os.name == "nt":  # command for windows
-            self.java = self.base_dir / "tracker_utils" / "ImageJ" / "jre" / "bin" / "java.exe"
+            self.java = self.base_dir / "NND_utils" / "ImageJ" / "jre" / "bin" / "java.exe"
             self.classpath_sep = ";"
         else:  # command for other systems
-            self.java = self.base_dir / "tracker_utils" / "ImageJ" / "jre" / "bin" / "java"
+            self.java = self.base_dir / "NND_utils" / "ImageJ" / "jre" / "bin" / "java"
             self.classpath_sep = ":"
                             
         # location of the java tracking plugin
-        self.TP_dir = self.base_dir / "tracker_utils" / "SOSTracker commandline"
+        self.TP_dir = self.base_dir / "NND_utils" / "SOSTracker commandline"
 
         # Classpath jars
         jars = ["VENI_.jar", "ij.jar", "imagescience.jar", "Jama-1.0.2.jar"]
@@ -386,8 +384,7 @@ class NND_tracker(object):
             
             output_file = np.vstack(output_file)
             np.savetxt(str(save_path / "res_track.txt"), output_file, fmt="%d")
-
-    
+   
     @staticmethod        
     def convert_to_detections(in_fold, out_folder):
         
@@ -411,8 +408,6 @@ class NND_tracker(object):
         np.savetxt(out_folder / "detections.xml.txt", all_detections, fmt='%.2f', delimiter='\t')
         
         return segmentation_stack
-
-
 
 class trackastra_tracker(object):
 

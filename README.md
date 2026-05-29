@@ -27,7 +27,7 @@ The pipeline runs in seven sequential steps:
 
 ---
 
-## Four ways to run LiFT
+## Five ways to run LiFT
 
 ### 1. Interactive GUI — `LiFT_app.py`
 
@@ -146,6 +146,98 @@ lift config data/experiment_name step5_detection.threshold=40
  
 With no `key=value` arguments, prints the current config.
  
+---
+
+### 5. Docker Image
+
+## Docker
+ 
+LiFT ships a single `Dockerfile` that accepts two build arguments, so you never need multiple Dockerfiles.
+ 
+### Build arguments
+ 
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `BASE_IMAGE` | Base image — use `python:3.11-slim` for CPU or `nvidia/cuda:12.1.0-runtime-ubuntu22.04` for GPU | `python:3.11-slim` |
+| `EXTRAS` | Comma-separated pip extras to install | _(none)_ |
+ 
+### Building an image
+ 
+```bash
+# base only — no segmentation backend
+docker build -t lift .
+ 
+# CPU: cellpose-v3, no GPU needed
+docker build --build-arg EXTRAS="cp-v3" -t lift-cpu .
+ 
+# GPU: cellpose-SAM, requires NVIDIA container runtime
+docker build \
+  --build-arg BASE_IMAGE=nvidia/cuda:12.1.0-runtime-ubuntu22.04 \
+  --build-arg EXTRAS="cp-sam" \
+  -t lift-gpu .
+ 
+# full: everything installed
+docker build \
+  --build-arg BASE_IMAGE=nvidia/cuda:12.1.0-runtime-ubuntu22.04 \
+  --build-arg EXTRAS="cp-sam,trackastra,spotiflow,elastix" \
+  -t lift-full .
+ 
+# custom combination
+docker build --build-arg EXTRAS="cp-v3,trackastra" -t lift-custom .
+```
+ 
+### Running
+ 
+Mount your data folder into `/data` and pass the same commands as the CLI:
+ 
+```bash
+# generate config
+docker run --rm -v $(pwd)/data:/data lift-cpu init /data/experiment_name
+ 
+# run all steps
+docker run --rm -v $(pwd)/data:/data lift-cpu run /data/experiment_name
+ 
+# run specific steps
+docker run --rm -v $(pwd)/data:/data lift-cpu run /data/experiment_name --steps 5 6
+ 
+# GPU run
+docker run --rm --gpus all -v $(pwd)/data:/data lift-gpu run /data/experiment_name
+ 
+# check installed packages
+docker run --rm lift-cpu info
+```
+ 
+On Windows use `%cd%` instead of `$(pwd)`:
+ 
+```bash
+docker run --rm -v %cd%/data:/data lift-cpu run /data/experiment_name
+```
+ 
+### Using docker compose
+ 
+The `docker-compose.yml` defines three pre-configured profiles (`cpu`, `gpu`, `full`) and a `custom` profile driven by environment variables:
+ 
+```bash
+# build a profile
+docker compose --profile cpu build
+docker compose --profile gpu build
+ 
+# run
+docker compose --profile cpu  run cpu  run /data/experiment_name
+docker compose --profile gpu  run gpu  run /data/experiment_name
+docker compose --profile full run full run /data/experiment_name --steps 5 6
+ 
+# custom combination via environment variables
+BASE_IMAGE=python:3.11-slim EXTRAS=cp-v3,trackastra docker compose --profile custom build custom
+docker compose --profile custom run custom run /data/experiment_name
+```
+ 
+### Notes
+ 
+**NVIDIA runtime** is required for GPU images. Install [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) and ensure `nvidia-smi` works inside a container before using the GPU profiles.
+ 
+**Image sizes**: the GPU images are large (~5–8 GB) due to the CUDA base and torch. The CPU image with `cp-v3` is around 3 GB. Build once and reuse.
+
 ---
 
 ## Parameter reproducibility

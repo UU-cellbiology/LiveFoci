@@ -1,0 +1,60 @@
+version: "3.9"
+
+x-lift-base: &lift-base
+  build:
+    context: .
+    dockerfile: Dockerfile
+  volumes:
+    - ./data:/data
+
+services:
+
+  cpu:
+    <<: *lift-base
+    build:
+      context: .
+      args:
+        BASE_IMAGE: python:3.11-slim
+        EXTRAS: "cp-v3"
+    profiles: [cpu]
+
+  gpu:
+    <<: *lift-base
+    build:
+      context: .
+      args:
+        BASE_IMAGE: nvidia/cuda:12.1.0-runtime-ubuntu22.04
+        EXTRAS: "cp-sam"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    profiles: [gpu]
+
+  full:
+    <<: *lift-base
+    build:
+      context: .
+      args:
+        BASE_IMAGE: nvidia/cuda:12.1.0-runtime-ubuntu22.04
+        EXTRAS: "cp-sam,trackastra,spotiflow,elastix"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    profiles: [full]
+
+  custom:
+    <<: *lift-base
+    build:
+      context: .
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-python:3.11-slim}
+        EXTRAS: ${EXTRAS:-}
+    profiles: [custom]
