@@ -1,0 +1,438 @@
+{% extends "base.html" %}
+
+{% block title %}Step 2 – Nuclei Tracking{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <span class="badge bg-primary fs-6 me-3">Step 2</span>
+  <h4 class="fw-bold mb-0">Nuclei Tracking</h4>
+</div>
+
+<div class="row g-4">
+
+  <!-- ════════════════════════════════════════════════════════
+       LEFT COLUMN  (settings)
+       ════════════════════════════════════════════════════════ -->
+  <div class="col-xl-4 col-lg-5">
+
+    <!-- ── Data configuration ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-folder2-open text-primary"></i> Data
+      </div>
+      <div class="card-body">
+        <div class="mb-2">
+          <label class="form-label param-label">Data folder</label>
+          <input id="dataPath" type="text" class="form-control form-control-sm"
+                 value="{{ default_data_path }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label param-label">
+            Glob pattern
+            <i class="bi bi-info-circle text-muted ms-1"
+               data-bs-toggle="tooltip"
+               title="Pattern to locate the segmentation result folders produced by Step 1."></i>
+          </label>
+          <input id="pattern" type="text" class="form-control form-control-sm"
+                 value="*/*/Pos*/results/result_cell_seg">
+        </div>
+        <button class="btn btn-sm btn-outline-primary w-100" onclick="discoverPaths()">
+          <i class="bi bi-search me-1"></i>Discover folders
+        </button>
+        <div id="pathsInfo" class="mt-2 text-muted small"></div>
+      </div>
+    </div>
+
+    <!-- ── Tracking method ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-diagram-3 text-primary"></i> Tracking method
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label param-label">Method</label>
+          <select id="trackingMethod" class="form-select form-select-sm"
+                  onchange="updateMethodParams()">
+            <option value="NND">NND – Nearest-neighbour with diffusion (recommended)</option>
+            <option value="IOU">IOU – Intersection over Union</option>
+            <option value="trackastra">Trackastra – Transformer-based</option>
+          </select>
+        </div>
+
+        <!-- shared: min track length -->
+        <div class="row g-2 align-items-center mb-3">
+          <div class="col param-label">
+            Min track length
+            <i class="bi bi-info-circle text-muted ms-1"
+               data-bs-toggle="tooltip"
+               title="Tracks shorter than this number of frames are removed."></i>
+          </div>
+          <div class="col-5">
+            <input type="range" class="form-range" id="minLength" min="1" max="100" step="1"
+                   value="36" oninput="showVal('minLength','minLengthVal')">
+          </div>
+          <div class="col-auto param-value-display" id="minLengthVal">36</div>
+        </div>
+
+        <!-- NND params -->
+        <div id="nndParams">
+          <div class="row g-2 align-items-center mb-2">
+            <div class="col param-label">
+              Max distance (px)
+              <i class="bi bi-info-circle text-muted ms-1"
+                 data-bs-toggle="tooltip"
+                 title="Maximum allowed displacement between frames for linking two detections."></i>
+            </div>
+            <div class="col-5">
+              <input type="range" class="form-range" id="maxDistance" min="5" max="150" step="1"
+                     value="30" oninput="showVal('maxDistance','maxDistanceVal')">
+            </div>
+            <div class="col-auto param-value-display" id="maxDistanceVal">30</div>
+          </div>
+          <div class="row g-2 align-items-center">
+            <div class="col param-label">
+              Gap closing
+              <i class="bi bi-info-circle text-muted ms-1"
+                 data-bs-toggle="tooltip"
+                 title="Number of missing frames to bridge when re-linking a lost nucleus. Keep at 0 to disable."></i>
+            </div>
+            <div class="col-5">
+              <input type="range" class="form-range" id="gapClosing" min="0" max="10" step="1"
+                     value="0" oninput="showVal('gapClosing','gapClosingVal')">
+            </div>
+            <div class="col-auto param-value-display" id="gapClosingVal">0</div>
+          </div>
+        </div>
+
+        <!-- IOU params -->
+        <div id="iouParams" style="display:none">
+          <div class="row g-2 align-items-center">
+            <div class="col param-label">
+              Min IOU
+              <i class="bi bi-info-circle text-muted ms-1"
+                 data-bs-toggle="tooltip"
+                 title="Minimum overlap (intersection-over-union) required to link two nuclei. Keep low (0.01) to catch any overlap."></i>
+            </div>
+            <div class="col-5">
+              <input type="range" class="form-range" id="iouMin" min="0.01" max="0.9" step="0.01"
+                     value="0.01" oninput="showVal('iouMin','iouMinVal')">
+            </div>
+            <div class="col-auto param-value-display" id="iouMinVal">0.01</div>
+          </div>
+        </div>
+
+        <!-- trackastra params -->
+        <div id="trackastraParams" style="display:none">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="removeGaps" checked>
+            <label class="form-check-label param-label" for="removeGaps">
+              Remove gaps
+              <i class="bi bi-info-circle text-muted ms-1"
+                 data-bs-toggle="tooltip"
+                 title="When enabled, tracks are split into separate segments wherever a detection is missing."></i>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Display ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-eye text-primary"></i> Display
+      </div>
+      <div class="card-body">
+        <div class="row g-2 align-items-center">
+          <div class="col param-label">
+            Max intensity
+            <i class="bi bi-info-circle text-muted ms-1"
+               data-bs-toggle="tooltip"
+               title="Upper clip value for the raw image in the preview."></i>
+          </div>
+          <div class="col-5">
+            <input type="range" class="form-range" id="maxInt" min="1" max="500" step="1"
+                   value="100" oninput="showVal('maxInt','maxIntVal')">
+          </div>
+          <div class="col-auto param-value-display" id="maxIntVal">100</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Actions ── -->
+    <div class="card">
+      <div class="card-body">
+        <div class="d-grid gap-2">
+          <button id="previewBtn" class="btn btn-outline-primary" onclick="runPreview()" disabled>
+            <span id="previewSpinner" class="spinner-border spinner-border-sm me-2"
+                  style="display:none" role="status"></span>
+            <i class="bi bi-eye me-1"></i>Preview (random position)
+          </button>
+          <button id="runBtn" class="btn btn-primary" onclick="runAll()" disabled>
+            <i class="bi bi-play-fill me-1"></i>Run tracking on all data
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="yamlBadge" class="text-success small mt-1" style="display:none">
+      <i class="bi bi-check2-circle me-1"></i>Parameters saved to parameters.yml
+    </div>
+
+  </div><!-- /left column -->
+
+
+  <!-- ════════════════════════════════════════════════════════
+       RIGHT COLUMN  (results)
+       ════════════════════════════════════════════════════════ -->
+  <div class="col-xl-8 col-lg-7">
+
+    <!-- Preview panel -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-images text-primary"></i> Preview
+      </div>
+      <div class="card-body" id="previewResults">
+        <p class="text-muted small mb-0">
+          <i class="bi bi-arrow-left me-1"></i>
+          Configure parameters, then click <strong>Preview</strong> to run tracking on a
+          randomly selected position and inspect the result.
+        </p>
+      </div>
+    </div>
+
+    <!-- Progress panel -->
+    <div class="card" id="progressCard" style="display:none">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-bar-chart-steps text-primary"></i> Run progress
+      </div>
+      <div class="card-body">
+        <div class="progress mb-3" style="height: 22px;">
+          <div id="progressBar"
+               class="progress-bar progress-bar-striped progress-bar-animated"
+               role="progressbar" style="width: 0%">0 / 0</div>
+        </div>
+        <div id="progressLog" class="log-box"></div>
+      </div>
+    </div>
+
+  </div><!-- /right column -->
+
+</div><!-- /row -->
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+    new bootstrap.Tooltip(el);
+  });
+
+  let discoveredPaths = [];
+  let currentTaskId   = null;
+  let pollingTimer    = null;
+
+  // ── helpers ────────────────────────────────────────────────────────────────
+  function showVal(sliderId, displayId) {
+    document.getElementById(displayId).textContent =
+      parseFloat(document.getElementById(sliderId).value);
+  }
+
+  function setActionButtons(enabled) {
+    document.getElementById('previewBtn').disabled = !enabled;
+    document.getElementById('runBtn').disabled     = !enabled;
+  }
+
+  // ── discover paths ─────────────────────────────────────────────────────────
+  async function discoverPaths() {
+    const info = document.getElementById('pathsInfo');
+    info.textContent = 'Searching…';
+    setActionButtons(false);
+
+    const resp = await fetch('/api/discover_paths', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        data_path: document.getElementById('dataPath').value,
+        pattern:   document.getElementById('pattern').value,
+      }),
+    });
+    const data = await resp.json();
+
+    if (data.success) {
+      discoveredPaths = data.paths;
+      if (data.count === 0) {
+        info.innerHTML = '<span class="text-warning">No folders found – check path &amp; pattern. ' +
+                         'Make sure Step 1 has been run first.</span>';
+      } else {
+        info.innerHTML =
+          `<span class="text-success"><i class="bi bi-check2 me-1"></i>` +
+          `Found <strong>${data.count}</strong> segmentation folder(s).</span>`;
+        setActionButtons(true);
+      }
+    } else {
+      info.innerHTML = `<span class="text-danger">Error: ${data.error}</span>`;
+    }
+  }
+
+  // ── show / hide method parameters ──────────────────────────────────────────
+  function updateMethodParams() {
+    const m = document.getElementById('trackingMethod').value;
+    document.getElementById('nndParams').style.display         = m === 'NND'         ? '' : 'none';
+    document.getElementById('iouParams').style.display         = m === 'IOU'         ? '' : 'none';
+    document.getElementById('trackastraParams').style.display  = m === 'trackastra'  ? '' : 'none';
+  }
+
+  // ── collect parameters ─────────────────────────────────────────────────────
+  function getParams() {
+    return {
+      data_path:       document.getElementById('dataPath').value,
+      seg_paths:       discoveredPaths,
+      tracking_method: document.getElementById('trackingMethod').value,
+      min_length:      parseInt(document.getElementById('minLength').value),
+      max_distance:    parseFloat(document.getElementById('maxDistance').value),
+      gap_closing:     parseInt(document.getElementById('gapClosing').value),
+      iou_min:         parseFloat(document.getElementById('iouMin').value),
+      remove_gaps:     document.getElementById('removeGaps').checked,
+      max_int:         parseFloat(document.getElementById('maxInt').value),
+    };
+  }
+
+  // ── preview ────────────────────────────────────────────────────────────────
+  async function runPreview() {
+    const btn     = document.getElementById('previewBtn');
+    const spinner = document.getElementById('previewSpinner');
+    const panel   = document.getElementById('previewResults');
+
+    btn.disabled = true;
+    spinner.style.display = 'inline-block';
+    panel.innerHTML =
+      '<p class="text-muted small"><i class="bi bi-hourglass-split me-1"></i>' +
+      'Running tracker on a random position – please wait…</p>';
+
+    try {
+      const resp = await fetch('/api/preview_tracking', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(getParams()),
+      });
+      const data = await resp.json();
+
+      if (data.success) {
+        renderPreview(data);
+      } else {
+        panel.innerHTML =
+          `<div class="alert alert-danger mb-0"><strong>Error:</strong> ${data.error}</div>`;
+      }
+    } catch (e) {
+      panel.innerHTML =
+        `<div class="alert alert-danger mb-0">Request failed: ${e.message}</div>`;
+    } finally {
+      btn.disabled = false;
+      spinner.style.display = 'none';
+    }
+  }
+
+  function renderPreview(data) {
+    const panel = document.getElementById('previewResults');
+
+    panel.innerHTML =
+      `<p class="text-muted small mb-1">
+         <i class="bi bi-folder2 me-1"></i><code>${data.selected_path}</code>
+       </p>
+       <p class="small mb-3">
+         <span class="badge bg-secondary me-1">${data.n_tracks} track(s)</span>
+         <span class="badge bg-secondary">${data.n_frames} frames</span>
+       </p>
+       <video width="700" controls loop style="border-radius:6px; background:#000;">
+         <source src="data:video/mp4;base64,${data.movie_b64}" type="video/mp4">
+         Your browser does not support the video tag.
+       </video>`;
+  }
+
+  // ── run all ────────────────────────────────────────────────────────────────
+  async function runAll() {
+    const runBtn       = document.getElementById('runBtn');
+    const progressCard = document.getElementById('progressCard');
+    const bar          = document.getElementById('progressBar');
+    const log          = document.getElementById('progressLog');
+
+    runBtn.disabled = true;
+    progressCard.style.display = '';
+    bar.style.width = '0%';
+    bar.textContent = '0 / 0';
+    bar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+    log.innerHTML = '';
+
+    try {
+      const resp = await fetch('/api/run_tracking', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(getParams()),
+      });
+      const data = await resp.json();
+
+      if (!data.success) {
+        appendLog(log, data.error, 'log-err');
+        runBtn.disabled = false;
+        return;
+      }
+
+      currentTaskId = data.task_id;
+      if (data.yaml_saved) document.getElementById('yamlBadge').style.display = '';
+      startPolling();
+    } catch (e) {
+      appendLog(log, `Request failed: ${e.message}`, 'log-err');
+      runBtn.disabled = false;
+    }
+  }
+
+  function startPolling() {
+    if (pollingTimer) clearInterval(pollingTimer);
+    pollingTimer = setInterval(pollProgress, 1200);
+  }
+
+  async function pollProgress() {
+    try {
+      const resp = await fetch(`/api/progress/${currentTaskId}`);
+      const data = await resp.json();
+      if (!data.success) return;
+
+      const bar = document.getElementById('progressBar');
+      const log = document.getElementById('progressLog');
+
+      const pct = data.total > 0 ? Math.round(data.progress / data.total * 100) : 0;
+      bar.style.width = pct + '%';
+      bar.textContent = `${data.progress} / ${data.total}`;
+
+      log.innerHTML = data.log.map(line => {
+        const cls = line.startsWith('ERROR')   ? 'log-err'
+                  : line.startsWith('  saved') || line === 'All done!' ? 'log-ok'
+                  : '';
+        return `<span class="${cls}">${escapeHtml(line)}</span>`;
+      }).join('\n');
+      log.scrollTop = log.scrollHeight;
+
+      if (data.status === 'done') {
+        clearInterval(pollingTimer);
+        bar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+        bar.classList.add('bg-success');
+        document.getElementById('runBtn').disabled = false;
+      } else if (data.status === 'error') {
+        clearInterval(pollingTimer);
+        bar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+        bar.classList.add('bg-danger');
+        document.getElementById('runBtn').disabled = false;
+      }
+    } catch (_) { /* network blip */ }
+  }
+
+  function appendLog(el, text, cls) {
+    el.innerHTML += `<span class="${cls || ''}">${escapeHtml(text)}</span>\n`;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+{% endblock %}

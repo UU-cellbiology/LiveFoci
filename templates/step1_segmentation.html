@@ -1,0 +1,569 @@
+{% extends "base.html" %}
+
+{% block title %}Step 1 – Nuclei Segmentation{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-4">
+  <span class="badge bg-primary fs-6 me-3">Step 1</span>
+  <h4 class="fw-bold mb-0">Nuclei Segmentation</h4>
+</div>
+
+<div class="row g-4">
+
+  <!-- ════════════════════════════════════════════════════════
+       LEFT COLUMN  (settings)
+       ════════════════════════════════════════════════════════ -->
+  <div class="col-xl-4 col-lg-5">
+
+    <!-- ── Data configuration ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-folder2-open text-primary"></i> Data
+      </div>
+      <div class="card-body">
+        <div class="mb-2">
+          <label class="form-label param-label">Data folder</label>
+          <input id="dataPath" type="text" class="form-control form-control-sm"
+                 value="{{ default_data_path }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label param-label">
+            Glob pattern
+            <i class="bi bi-info-circle text-muted ms-1"
+               data-bs-toggle="tooltip"
+               title="Pattern used to find 'raw' image folders inside the data folder. Use * as wildcard."></i>
+          </label>
+          <input id="pattern" type="text" class="form-control form-control-sm"
+                 value="*/*/Pos*/raw">
+        </div>
+        <button class="btn btn-sm btn-outline-primary w-100" onclick="discoverPaths()">
+          <i class="bi bi-search me-1"></i>Discover folders
+        </button>
+        <div id="pathsInfo" class="mt-2 text-muted small"></div>
+      </div>
+    </div>
+
+    <!-- ── Preprocessing ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-sliders text-primary"></i> Preprocessing
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label param-label">Method</label>
+          <select id="preprocessingMethod" class="form-select form-select-sm"
+                  onchange="updatePreprocessingParams()">
+            <option value="None">None (use raw images)</option>
+            <option value="contrast_adjuster">Contrast adjuster</option>
+            <option value="wavelet_filtering">Wavelet filtering</option>
+          </select>
+        </div>
+
+        <!-- contrast params -->
+        <div id="contrastParams" style="display:none">
+          <div class="row g-2 align-items-center mb-2">
+            <div class="col param-label">Sigma (blur)
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Gaussian blur radius. Smooths out foci so the model sees the nucleus shape rather than bright spots. Increase if foci signals are very strong."></i>
+            </div>
+            <div class="col-5">
+              <input type="range" class="form-range" id="sigma" min="0.5" max="15" step="0.5"
+                     value="3.0" oninput="showVal('sigma','sigmaVal')">
+            </div>
+            <div class="col-auto param-value-display" id="sigmaVal">3.0</div>
+          </div>
+          <div class="row g-2 align-items-center">
+            <div class="col param-label">Clip factor
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Clips the blurred image at (mean × factor), then normalises. Lower values make the nucleus interior brighter relative to background — useful when the nucleus edge is faint."></i>
+            </div>
+            <div class="col-5">
+              <input type="range" class="form-range" id="cFactor" min="0.5" max="20" step="0.5"
+                     value="6.0" oninput="showVal('cFactor','cFactorVal')">
+            </div>
+            <div class="col-auto param-value-display" id="cFactorVal">6.0</div>
+          </div>
+        </div>
+
+        <!-- wavelet params -->
+        <div id="waveletParams" style="display:none">
+          <div class="row g-2 align-items-center mb-2">
+            <div class="col param-label">Scales
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Number of wavelet decomposition levels. More scales capture larger structures but increase computation time."></i>
+            </div>
+            <div class="col-5">
+              <input type="range" class="form-range" id="scales" min="2" max="12" step="1"
+                     value="5" oninput="showVal('scales','scalesVal')">
+            </div>
+            <div class="col-auto param-value-display" id="scalesVal">5</div>
+          </div>
+          <div class="row g-2 align-items-center mb-2">
+            <div class="col param-label">W-factor
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Suppression threshold for wavelet coefficients. Increase to remove more high-frequency detail (foci), giving a smoother result."></i>
+            </div>
+            <div class="col-5">
+              <input type="range" class="form-range" id="wFactor" min="0.5" max="5" step="0.1"
+                     value="1.5" oninput="showVal('wFactor','wFactorVal')">
+            </div>
+            <div class="col-auto param-value-display" id="wFactorVal">1.5</div>
+          </div>
+          <div class="row g-2 align-items-center">
+            <div class="col param-label">Start scale
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="First wavelet scale included in the reconstruction. Higher values discard finer detail, producing a smoother image. 2 is a good default."></i>
+            </div>
+            <div class="col-5">
+              <input type="range" class="form-range" id="startScale" min="0" max="6" step="1"
+                     value="2" oninput="showVal('startScale','startScaleVal')">
+            </div>
+            <div class="col-auto param-value-display" id="startScaleVal">2</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Segmentation model ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-cpu text-primary"></i> Segmentation model
+      </div>
+      <div class="card-body">
+
+        <!-- environment warning -->
+        <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:0.8rem">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i>
+          <strong>Environment note:</strong> Cellpose-SAM and Cellpose&nbsp;V3 require
+          <em>separate conda environments</em> and cannot be used interchangeably within
+          the same running app. Choose the model that matches your active environment
+          and <strong>restart the app</strong> if you need to switch.
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label param-label">Model</label>
+          <select id="segMethod" class="form-select form-select-sm"
+                  onchange="updateSegParams(); showModelSwitchWarning()">
+            <option value="CP_SAM">Cellpose-SAM (GPU)</option>
+            <option value="CP_V3">Cellpose V3 (CPU/GPU)</option>
+          </select>
+          <div id="modelSwitchWarning" class="mt-1 text-danger" style="display:none; font-size:0.78rem">
+            <i class="bi bi-arrow-repeat me-1"></i>
+            You changed the model — make sure this matches your conda environment,
+            otherwise the app will crash. Restart with the correct environment if needed.
+          </div>
+        </div>
+
+        <!-- shared flow / prob thresholds -->
+        <div class="row g-2 align-items-center mb-2">
+          <div class="col param-label">Flow threshold
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Maximum allowed error in the predicted flow field. Increase to accept more nuclei with imperfect shapes."></i>
+          </div>
+          <div class="col-5">
+            <input type="range" class="form-range" id="flowT" min="0" max="5" step="0.1"
+                   value="0.0" oninput="showVal('flowT','flowTVal')">
+          </div>
+          <div class="col-auto param-value-display" id="flowTVal">0.0</div>
+        </div>
+        <div class="row g-2 align-items-center mb-3">
+          <div class="col param-label">Prob threshold
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Minimum cell-probability score to accept a nucleus. Decrease (more negative) to detect more — including dim or partially-visible nuclei."></i>
+          </div>
+          <div class="col-5">
+            <input type="range" class="form-range" id="probT" min="-5" max="5" step="0.1"
+                   value="-0.5" oninput="showVal('probT','probTVal')">
+          </div>
+          <div class="col-auto param-value-display" id="probTVal">-0.5</div>
+        </div>
+
+        <!-- CP-SAM params -->
+        <div id="cpsamParams">
+          <div class="row g-2 align-items-center">
+            <div class="col param-label">Scale factor
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Rescales the image before segmentation. Cellpose-SAM works best when nuclei are 7.5–120 px in diameter — adjust so your nuclei fall in that range (e.g. 0.5 halves the image)."></i>
+            </div>
+            <div class="col-5">
+              <input type="range" class="form-range" id="scaleFactor" min="0.1" max="2" step="0.05"
+                     value="0.5" oninput="showVal('scaleFactor','scaleFactorVal')">
+            </div>
+            <div class="col-auto param-value-display" id="scaleFactorVal">0.5</div>
+          </div>
+        </div>
+
+        <!-- CP-V3 params -->
+        <div id="cpv3Params" style="display:none">
+          <div class="row g-2 align-items-center">
+            <div class="col param-label">Diameter (px)
+              <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+                 title="Expected nucleus diameter in pixels. Used by Cellpose V3 to set the detection scale. Measure a representative nucleus in ImageJ if unsure."></i>
+            </div>
+            <div class="col-5">
+              <input type="range" class="form-range" id="diameter" min="20" max="400" step="5"
+                     value="140" oninput="showVal('diameter','diameterVal')">
+            </div>
+            <div class="col-auto param-value-display" id="diameterVal">140</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Display / advanced ── -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-eye text-primary"></i> Display &amp; Advanced
+      </div>
+      <div class="card-body">
+        <div class="row g-2 align-items-center mb-2">
+          <div class="col param-label">
+            Max intensity
+            <i class="bi bi-info-circle text-muted ms-1"
+               data-bs-toggle="tooltip"
+               title="Upper clip value for displaying raw images (lower → brighter cells)"></i>
+          </div>
+          <div class="col-5">
+            <input type="range" class="form-range" id="maxInt" min="1" max="500" step="1"
+                   value="60" oninput="showVal('maxInt','maxIntVal')">
+          </div>
+          <div class="col-auto param-value-display" id="maxIntVal">60</div>
+        </div>
+        <div class="row g-2 align-items-center">
+          <div class="col param-label">Min nucleus area (px²)
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Segmented objects smaller than this area are discarded as debris or false detections. Increase if you see many tiny spurious objects."></i>
+          </div>
+          <div class="col-5">
+            <input type="range" class="form-range" id="minArea" min="100" max="5000" step="50"
+                   value="1000" oninput="showVal('minArea','minAreaVal')">
+          </div>
+          <div class="col-auto param-value-display" id="minAreaVal">1000</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Actions ── -->
+    <div class="card">
+      <div class="card-body">
+        <div class="d-grid gap-2">
+          <button id="previewBtn" class="btn btn-outline-primary" onclick="runPreview()" disabled>
+            <span id="previewSpinner" class="spinner-border spinner-border-sm me-2"
+                  style="display:none" role="status"></span>
+            <i class="bi bi-eye me-1"></i>Preview (random sample)
+          </button>
+          <button id="runBtn" class="btn btn-primary" onclick="runAll()" disabled>
+            <i class="bi bi-play-fill me-1"></i>Run segmentation on all data
+          </button>
+        </div>
+        <div id="noPathsWarning" class="mt-2 text-warning small" style="display:none">
+          <i class="bi bi-exclamation-triangle me-1"></i>Discover folders first.
+        </div>
+      </div>
+    </div>
+
+    <div id="yamlBadge" class="text-success small mt-1" style="display:none">
+      <i class="bi bi-check2-circle me-1"></i>Parameters saved to parameters.yml
+    </div>
+
+  </div><!-- /left column -->
+
+
+  <!-- ════════════════════════════════════════════════════════
+       RIGHT COLUMN  (results)
+       ════════════════════════════════════════════════════════ -->
+  <div class="col-xl-8 col-lg-7">
+
+    <!-- Preview panel -->
+    <div class="card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-images text-primary"></i> Preview
+      </div>
+      <div class="card-body" id="previewResults">
+        <p class="text-muted small mb-0">
+          <i class="bi bi-arrow-left me-1"></i>
+          Configure parameters, then click <strong>Preview</strong> to inspect results on a
+          randomly selected position.
+        </p>
+      </div>
+    </div>
+
+    <!-- Progress panel -->
+    <div class="card" id="progressCard" style="display:none">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-bar-chart-steps text-primary"></i> Run progress
+      </div>
+      <div class="card-body">
+        <div class="progress mb-3" style="height: 22px;">
+          <div id="progressBar"
+               class="progress-bar progress-bar-striped progress-bar-animated"
+               role="progressbar" style="width: 0%">0 / 0</div>
+        </div>
+        <div id="progressLog" class="log-box"></div>
+      </div>
+    </div>
+
+  </div><!-- /right column -->
+
+</div><!-- /row -->
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+  // ── initialise Bootstrap tooltips ──────────────────────────────────────────
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+    new bootstrap.Tooltip(el);
+  });
+
+  // ── state ──────────────────────────────────────────────────────────────────
+  let discoveredPaths = [];
+  let currentTaskId   = null;
+  let pollingTimer    = null;
+
+  // ── helpers ────────────────────────────────────────────────────────────────
+  function showVal(sliderId, displayId) {
+    document.getElementById(displayId).textContent =
+      parseFloat(document.getElementById(sliderId).value);
+  }
+
+  function setActionButtons(enabled) {
+    document.getElementById('previewBtn').disabled = !enabled;
+    document.getElementById('runBtn').disabled     = !enabled;
+  }
+
+  // ── discover paths ─────────────────────────────────────────────────────────
+  async function discoverPaths() {
+    const info = document.getElementById('pathsInfo');
+    info.textContent = 'Searching…';
+    setActionButtons(false);
+
+    const resp = await fetch('/api/discover_paths', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        data_path: document.getElementById('dataPath').value,
+        pattern:   document.getElementById('pattern').value,
+      }),
+    });
+    const data = await resp.json();
+
+    if (data.success) {
+      discoveredPaths = data.paths;
+      if (data.count === 0) {
+        info.innerHTML = '<span class="text-warning">No folders found – check path &amp; pattern.</span>';
+      } else {
+        info.innerHTML =
+          `<span class="text-success"><i class="bi bi-check2 me-1"></i>Found <strong>${data.count}</strong> folder(s).</span>`;
+        setActionButtons(true);
+      }
+    } else {
+      info.innerHTML = `<span class="text-danger">Error: ${data.error}</span>`;
+    }
+  }
+
+  // ── show / hide parameter panels ───────────────────────────────────────────
+  function updatePreprocessingParams() {
+    const m = document.getElementById('preprocessingMethod').value;
+    document.getElementById('contrastParams').style.display =
+      m === 'contrast_adjuster' ? '' : 'none';
+    document.getElementById('waveletParams').style.display  =
+      m === 'wavelet_filtering' ? '' : 'none';
+  }
+
+  function updateSegParams() {
+    const m = document.getElementById('segMethod').value;
+    document.getElementById('cpsamParams').style.display = m === 'CP_SAM' ? '' : 'none';
+    document.getElementById('cpv3Params').style.display  = m === 'CP_V3'  ? '' : 'none';
+  }
+
+  // Track the model that was active when the page loaded so we can warn on change
+  const _initialSegMethod = document.getElementById('segMethod').value;
+  function showModelSwitchWarning() {
+    const changed = document.getElementById('segMethod').value !== _initialSegMethod;
+    document.getElementById('modelSwitchWarning').style.display = changed ? '' : 'none';
+  }
+
+  // ── collect current parameter values ───────────────────────────────────────
+  function getParams() {
+    return {
+      data_path:             document.getElementById('dataPath').value,
+      raw_paths:             discoveredPaths,
+      preprocessing_method:  document.getElementById('preprocessingMethod').value,
+      sigma:        parseFloat(document.getElementById('sigma').value),
+      c_factor:     parseFloat(document.getElementById('cFactor').value),
+      scales:       parseInt(document.getElementById('scales').value),
+      w_factor:     parseFloat(document.getElementById('wFactor').value),
+      start_scale:  parseInt(document.getElementById('startScale').value),
+      max_int:      parseFloat(document.getElementById('maxInt').value),
+      seg_method:   document.getElementById('segMethod').value,
+      flow_T:       parseFloat(document.getElementById('flowT').value),
+      prob_T:       parseFloat(document.getElementById('probT').value),
+      scale_factor: parseFloat(document.getElementById('scaleFactor').value),
+      diameter:     parseFloat(document.getElementById('diameter').value),
+      min_area:     parseInt(document.getElementById('minArea').value),
+    };
+  }
+
+  // ── preview ────────────────────────────────────────────────────────────────
+  async function runPreview() {
+    const btn     = document.getElementById('previewBtn');
+    const spinner = document.getElementById('previewSpinner');
+    const panel   = document.getElementById('previewResults');
+
+    btn.disabled = true;
+    spinner.style.display = 'inline-block';
+    panel.innerHTML =
+      '<p class="text-muted small"><i class="bi bi-hourglass-split me-1"></i>' +
+      'Running segmentation on a random sample – this may take a minute…</p>';
+
+    try {
+      const resp = await fetch('/api/preview_segmentation', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(getParams()),
+      });
+      const data = await resp.json();
+
+      if (data.success) {
+        renderPreview(data);
+      } else {
+        panel.innerHTML =
+          `<div class="alert alert-danger mb-0"><strong>Error:</strong> ${data.error}</div>`;
+      }
+    } catch (e) {
+      panel.innerHTML =
+        `<div class="alert alert-danger mb-0">Request failed: ${e.message}</div>`;
+    } finally {
+      btn.disabled = false;
+      spinner.style.display = 'none';
+    }
+  }
+
+  function renderPreview(data) {
+    const panel = document.getElementById('previewResults');
+
+    let html =
+      `<p class="text-muted small mb-2">
+         <i class="bi bi-folder2 me-1"></i>
+         <code>${data.selected_path}</code>
+       </p>`;
+
+    html += '<div class="table-responsive"><table class="table table-borderless preview-table mb-0"><thead><tr>';
+    html += '<th></th>';  // row-label column
+    data.images.forEach(img => {
+      html += `<th class="text-center text-muted small">Frame&nbsp;${img.frame}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+
+    const rows = [
+      { key: 'raw',       label: 'Input'     },
+      { key: 'processed', label: 'Processed' },
+      { key: 'segmented', label: 'Segmented' },
+    ];
+
+    rows.forEach(row => {
+      html += `<tr><td class="row-label">${row.label}</td>`;
+      data.images.forEach(img => {
+        html += `<td><img src="data:image/png;base64,${img[row.key]}" class="preview-img">`;
+        if (row.key === 'segmented') {
+          html += `<div class="text-center text-muted" style="font-size:.75rem">${img.n_nuclei} nuclei</div>`;
+        }
+        html += '</td>';
+      });
+      html += '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+    panel.innerHTML = html;
+  }
+
+  // ── run all ────────────────────────────────────────────────────────────────
+  async function runAll() {
+    const runBtn      = document.getElementById('runBtn');
+    const progressCard = document.getElementById('progressCard');
+    const bar         = document.getElementById('progressBar');
+    const log         = document.getElementById('progressLog');
+
+    runBtn.disabled = true;
+    progressCard.style.display = '';
+    bar.style.width = '0%';
+    bar.textContent = '0 / 0';
+    bar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+    log.innerHTML = '';
+
+    try {
+      const resp = await fetch('/api/run_segmentation', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(getParams()),
+      });
+      const data = await resp.json();
+
+      if (!data.success) {
+        appendLog(log, data.error, 'log-err');
+        runBtn.disabled = false;
+        return;
+      }
+
+      currentTaskId = data.task_id;
+      if (data.yaml_saved) document.getElementById('yamlBadge').style.display = '';
+      startPolling();
+
+    } catch (e) {
+      appendLog(log, `Request failed: ${e.message}`, 'log-err');
+      runBtn.disabled = false;
+    }
+  }
+
+  function startPolling() {
+    if (pollingTimer) clearInterval(pollingTimer);
+    pollingTimer = setInterval(pollProgress, 1200);
+  }
+
+  async function pollProgress() {
+    try {
+      const resp = await fetch(`/api/progress/${currentTaskId}`);
+      const data = await resp.json();
+      if (!data.success) return;
+
+      const bar = document.getElementById('progressBar');
+      const log = document.getElementById('progressLog');
+
+      const pct = data.total > 0 ? Math.round(data.progress / data.total * 100) : 0;
+      bar.style.width = pct + '%';
+      bar.textContent = `${data.progress} / ${data.total}`;
+
+      // rebuild log (simpler than diffing)
+      log.innerHTML = data.log.map(line => {
+        const cls = line.startsWith('ERROR') ? 'log-err'
+                  : line.startsWith('  saved') || line === 'All done!' ? 'log-ok'
+                  : '';
+        return `<span class="${cls}">${escapeHtml(line)}</span>`;
+      }).join('\n');
+      log.scrollTop = log.scrollHeight;
+
+      if (data.status === 'done') {
+        clearInterval(pollingTimer);
+        bar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+        bar.classList.add('bg-success');
+        document.getElementById('runBtn').disabled = false;
+      } else if (data.status === 'error') {
+        clearInterval(pollingTimer);
+        bar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+        bar.classList.add('bg-danger');
+        document.getElementById('runBtn').disabled = false;
+      }
+    } catch (_) { /* network blip – keep polling */ }
+  }
+
+  function appendLog(el, text, cls) {
+    el.innerHTML += `<span class="${cls || ''}">${escapeHtml(text)}</span>\n`;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+{% endblock %}

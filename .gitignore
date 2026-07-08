@@ -1,0 +1,18 @@
+# Ignore test scripts
+pipeline/quantify*.ipynb
+pipeline/register_cells.ipynb
+pipeline/make_paper_figures.ipynb
+pipeline/foci_detectors.ipynb
+tracking/
+
+# Ignore IDE settings
+.vscode/
+.ipynb_checkpoints/
+pipeline/.ipynb_checkpoints/
+__pycache__/
+*.pyc
+
+# Ignore data folders
+data/
+data*/
+paper/
