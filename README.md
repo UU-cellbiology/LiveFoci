@@ -78,171 +78,390 @@ LiFT.run("data/")
  
 ### 4. Python Package
 
-LiFT is also distributed as a Python package, leading to it being available in your codebase after installing it from PyPi.
+
+
+LiFT is published on [PyPI](https://pypi.org/project/lift-foci/) as `lift-foci` — install it and it's available in your codebase as `lift`.
+
+
 
 ```bash
+
 pip install lift-foci
+
+
+
+# with an optional extra, e.g. GPU segmentation
+
+pip install "lift-foci[cp-sam]"
+
 ```
+
+
+
+Confirm it installed correctly:
+
+
+
+```bash
+
+lift info
+
+```
+
+
 
 Every pipeline step is available as a Python function. Parameters can come from `parameters.yml` or be passed explicitly — explicit arguments always win over config.
+
  
+
 ```python
+
 import lift
+
  
+
 # run the full pipeline from config
+
 lift.run("data/experiment_name")
+
 lift.run("data/experiment_name", steps=[1, 2, 5, 6])
+
  
+
 # or call individual steps
+
 lift.segment("data/experiment_name")
+
 lift.segment("data/experiment_name", method="cellpose_v3", diameter=120, min_area=500)
+
  
+
 lift.track_nuclei("data/experiment_name")
+
 lift.track_nuclei("data/experiment_name", method="IOU", min_length=15)
+
  
+
 lift.crop("data/experiment_name", margin=50)
+
  
+
 lift.register("data/experiment_name")
+
 lift.register("data/experiment_name", method="stackreg")
+
  
+
 lift.detect("data/experiment_name")
+
 lift.detect("data/experiment_name", method="TopHat", threshold=36, sigma=0.6, radius=3.0)
+
  
+
 lift.track_foci("data/experiment_name")
+
 lift.track_foci("data/experiment_name", method="GNN", max_distance=8.0, gap_closing=3)
+
 ```
+
  
+
 ---
 
+
+
 ## CLI reference
+
  
+
 ```
+
 lift info                                         # show installed optional packages
+
 lift init [data_path]                             # generate parameters.yml (default: cwd)
+
 lift config [data_path] [key.path=value ...]      # interactive editor or set values directly
+
 lift run <data_path> [--steps N ...]              # run pipeline
+
 lift <data_path> [--steps N ...]                  # shorthand for lift run
+
 ```
+
  
+
 ### `lift init`
+
  
+
 Probes your environment for installed optional packages and writes a `parameters.yml` with the best available defaults, also checks currently installed packages and inserts these as options:
+
  
+
 ```bash
+
 lift init                          # writes to current directory
+
 lift init data/experiment_name     # writes to specified path
+
 ```
+
  
+
 ### `lift config`
+
  
+
 With no arguments, opens an interactive editor that walks through every parameter step by step, showing the current value and available options. Press Enter to keep a value unchanged, or type a new one. Ctrl+C saves what has been changed so far and exits.
+
  
+
 ```bash
+
 lift config                        # interactive editor in current directory
+
 lift config data/experiment_name   # interactive editor at path
+
 ```
+
  
+
 To set values directly without the interactive editor:
+
  
+
 ```bash
+
 lift config step5_detection.threshold=40
+
 lift config step5_detection.method=TopHat step5_detection.params.radius=3.0
+
 lift config step1_segmentation.segmentation.min_area=500
+
 lift config step4_registration.preprocessing=null
+
 lift config data/experiment_name step5_detection.threshold=40
+
 ```
+
  
+
 With no `key=value` arguments, prints the current config.
+
  
+
 ---
+
+
 
 ### 5. Docker Image
 
+
+
 ## Docker
+
  
+
 LiFT ships a single `Dockerfile` that accepts two build arguments, so you never need multiple Dockerfiles.
+
  
+
 ### Build arguments
+
  
+
 | Argument | Description | Default |
+
 |----------|-------------|---------|
+
 | `BASE_IMAGE` | Base image — use `python:3.11-slim` for CPU or `nvidia/cuda:12.1.0-runtime-ubuntu22.04` for GPU | `python:3.11-slim` |
+
 | `EXTRAS` | Comma-separated pip extras to install | _(none)_ |
+
  
-### Building an image
- 
+
+### Pull from Docker Hub
+
+
+
+Published images — no build required. Replace `<dockerhub-user>` with the actual namespace once you know it:
+
+
+
 ```bash
+
+docker pull <dockerhub-user>/lift:cpu    # cellpose-v3, no GPU needed
+
+docker pull <dockerhub-user>/lift:gpu    # cellpose-SAM, requires NVIDIA container runtime
+
+docker pull <dockerhub-user>/lift:full   # cpu-sam + trackastra + spotiflow
+
+
+
+# pin to a specific released version instead of the rolling tag
+
+docker pull <dockerhub-user>/lift:0.1.0-cpu
+
+```
+
+
+
+`elastix`/`NGMA`/`NND` are Windows-only and experimental — they are not included in any published image (see Platform support note below). Skip to **Running** below, using `<dockerhub-user>/lift:cpu` (etc.) in place of `lift-cpu`.
+
+
+
+### Building an image locally
+
+
+
+Only needed for a custom `EXTRAS` combination not covered by the published tags above.
+
+ 
+
+```bash
+
 # base only — no segmentation backend
+
 docker build -t lift .
+
  
+
 # CPU: cellpose-v3, no GPU needed
+
 docker build --build-arg EXTRAS="cp-v3" -t lift-cpu .
+
  
+
 # GPU: cellpose-SAM, requires NVIDIA container runtime
+
 docker build \
+
   --build-arg BASE_IMAGE=nvidia/cuda:12.1.0-runtime-ubuntu22.04 \
+
   --build-arg EXTRAS="cp-sam" \
+
   -t lift-gpu .
+
  
-# full: everything installed
+
+# full: everything available in Docker (elastix/NGMA/NND are Windows-only, excluded — see Platform support above)
+
 docker build \
+
   --build-arg BASE_IMAGE=nvidia/cuda:12.1.0-runtime-ubuntu22.04 \
-  --build-arg EXTRAS="cp-sam,trackastra,spotiflow,elastix" \
+
+  --build-arg EXTRAS="cp-sam,trackastra,spotiflow" \
+
   -t lift-full .
+
  
+
 # custom combination
+
 docker build --build-arg EXTRAS="cp-v3,trackastra" -t lift-custom .
+
 ```
+
  
+
 ### Running
+
  
-Mount your data folder into `/data` and pass the same commands as the CLI:
+
+Mount your data folder into `/data` and pass the same commands as the CLI. Examples below use the locally built tags (`lift-cpu`, `lift-gpu`) — swap in `<dockerhub-user>/lift:cpu` etc. if you pulled from Docker Hub instead, the usage is identical:
+
  
+
 ```bash
+
 # generate config
+
 docker run --rm -v $(pwd)/data:/data lift-cpu init /data/experiment_name
+
  
+
 # run all steps
+
 docker run --rm -v $(pwd)/data:/data lift-cpu run /data/experiment_name
+
  
+
 # run specific steps
+
 docker run --rm -v $(pwd)/data:/data lift-cpu run /data/experiment_name --steps 5 6
+
  
+
 # GPU run
+
 docker run --rm --gpus all -v $(pwd)/data:/data lift-gpu run /data/experiment_name
+
  
+
 # check installed packages
+
 docker run --rm lift-cpu info
+
 ```
+
  
+
 On Windows use `%cd%` instead of `$(pwd)`:
+
  
+
 ```bash
+
 docker run --rm -v %cd%/data:/data lift-cpu run /data/experiment_name
+
 ```
+
  
+
 ### Using docker compose
+
  
+
 The `docker-compose.yml` defines three pre-configured profiles (`cpu`, `gpu`, `full`) and a `custom` profile driven by environment variables:
+
  
+
 ```bash
+
 # build a profile
+
 docker compose --profile cpu build
+
 docker compose --profile gpu build
+
  
+
 # run
+
 docker compose --profile cpu  run cpu  run /data/experiment_name
+
 docker compose --profile gpu  run gpu  run /data/experiment_name
+
 docker compose --profile full run full run /data/experiment_name --steps 5 6
+
  
+
 # custom combination via environment variables
+
 BASE_IMAGE=python:3.11-slim EXTRAS=cp-v3,trackastra docker compose --profile custom build custom
+
 docker compose --profile custom run custom run /data/experiment_name
+
 ```
+
  
+
 ### Notes
+
  
+
 **NVIDIA runtime** is required for GPU images. Install [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) and ensure `nvidia-smi` works inside a container before using the GPU profiles.
+
  
 **Image sizes**: the GPU images are large (~5–8 GB) due to the CUDA base and torch. The CPU image with `cp-v3` is around 3 GB. Build once and reuse.
 
