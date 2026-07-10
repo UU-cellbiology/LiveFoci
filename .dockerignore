@@ -1,0 +1,15 @@
+# repo/version-control cruft
+.git
+.gitignore
+
+# python cruft
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+
+# local data / notebooks
+data/
+*.ipynb_checkpoints
