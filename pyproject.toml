@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "lift-foci"
+name = "live-foci"
 version = "0.1.0"
 authors = [
     { name = "Tijmen H. de Wolf", affiliation = "Erasmus MC Cancer Institute, University Medical Center Rotterdam" },

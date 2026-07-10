@@ -1,18 +1,22 @@
-# Ignore test scripts
-pipeline/quantify*.ipynb
-pipeline/register_cells.ipynb
-pipeline/make_paper_figures.ipynb
-pipeline/foci_detectors.ipynb
-tracking/
-
-# Ignore IDE settings
-.vscode/
-.ipynb_checkpoints/
-pipeline/.ipynb_checkpoints/
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+dist/
+build/
 
-# Ignore data folders
+# elastix scratch output (registration.py writes here at runtime)
+src/lift/utils_elastix/Temp/
+
+# notebooks
+.ipynb_checkpoints/
+
+# data / generated configs
 data/
 data*/
 paper/
+parameters.yml
+
+# editor / OS
+.vscode/
+.DS_Store
