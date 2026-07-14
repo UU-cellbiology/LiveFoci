@@ -4,12 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "live-foci"
-version = "0.1.0"
+version = "1.0.0"
 authors = [
     { name = "Tijmen H. de Wolf", affiliation = "Erasmus MC Cancer Institute, University Medical Center Rotterdam" },
     { name = "Krijn H. van der Steen", affiliation = "University Medical Center Utrecht, Lab of Cellular Disease Models" },
 ]
-description = "Live Foci Tracking pipeline"
+description = "LiFT is an end-to-end pipeline for detecting and tracking DNA-damage foci (e.g. γH2AX, 53BP1) in live-cell fluorescence microscopy timelapse data."
+readme = { file = "README.md", content-type = "text/markdown" }
+license = { file = "LICENSE" }
 requires-python = ">=3.9"
 dependencies = [
     "numpy>=1.24",
@@ -44,3 +46,11 @@ packages = ["src/lift"]
 
 [tool.hatch.build.targets.wheel.sources]
 "src" = ""
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/lift",
+    "pyproject.toml",
+    "README.md",
+    "LICENSE",
+]

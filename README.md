@@ -80,19 +80,19 @@ LiFT.run("data/")
 
 
 
-LiFT is published on [PyPI](https://pypi.org/project/lift-foci/) as `lift-foci` — install it and it's available in your codebase as `lift`.
+LiFT is published on [PyPI](https://pypi.org/project/live-foci/) as `live-foci` — install it and it's available in your codebase as `lift`.
 
 
 
 ```bash
 
-pip install lift-foci
+pip install live-foci
 
 
 
 # with an optional extra, e.g. GPU segmentation
 
-pip install "lift-foci[cp-sam]"
+pip install "live-foci[cp-sam]"
 
 ```
 
@@ -252,125 +252,90 @@ With no `key=value` arguments, prints the current config.
 
 ---
 
-
-
 ### 5. Docker Image
-
-
 
 ## Docker
 
- 
-
-LiFT ships a single `Dockerfile` that accepts two build arguments, so you never need multiple Dockerfiles.
-
- 
-
-### Build arguments
-
- 
-
-| Argument | Description | Default |
-
-|----------|-------------|---------|
-
-| `BASE_IMAGE` | Base image — use `python:3.11-slim` for CPU or `nvidia/cuda:12.1.0-runtime-ubuntu22.04` for GPU | `python:3.11-slim` |
-
-| `EXTRAS` | Comma-separated pip extras to install | _(none)_ |
-
- 
-
-### Pull from Docker Hub
+LiFT ships two Dockerfiles: `Dockerfile.base` (the heavy layer — OS packages + `live-foci` from PyPI, published to Docker Hub) and `Dockerfile` (a thin layer on top that adds whatever `EXTRAS` you want). This means Docker Hub only ever hosts two images — `cpu-base` and `gpu-base` — and you can build **any** combination of extras locally in seconds, since the heavy layer is already pulled and cached. There's no fixed set of presets to choose from.
 
 
-
-Published images — no build required. Replace `<dockerhub-user>` with the actual namespace once you know it:
+### Pull the base image
 
 
 
 ```bash
 
-docker pull <dockerhub-user>/lift:cpu    # cellpose-v3, no GPU needed
+docker pull krijns/lift:cpu-base   # python:3.11-slim, no GPU needed
 
-docker pull <dockerhub-user>/lift:gpu    # cellpose-SAM, requires NVIDIA container runtime
-
-docker pull <dockerhub-user>/lift:full   # cpu-sam + trackastra + spotiflow
+docker pull krijns/lift:gpu-base   # CUDA runtime, requires NVIDIA container runtime
 
 
 
 # pin to a specific released version instead of the rolling tag
 
-docker pull <dockerhub-user>/lift:0.1.0-cpu
+docker pull krijns/lift:0.1.0-cpu-base
 
 ```
 
 
 
-`elastix`/`NGMA`/`NND` are Windows-only and experimental — they are not included in any published image (see Platform support note below). Skip to **Running** below, using `<dockerhub-user>/lift:cpu` (etc.) in place of `lift-cpu`.
+The base image alone runs, but has no segmentation/tracking extras installed — you'll want to add extras next.
 
 
 
-### Building an image locally
+### Build your combination locally
 
 
 
-Only needed for a custom `EXTRAS` combination not covered by the published tags above.
+This is the step that replaces "pick a preset" — any comma-separated combination from `pyproject.toml`'s `[project.optional-dependencies]` (`cp-sam`, `cp-v3`, `trackastra`, `spotiflow`, `notebook`, `app`) works:
 
- 
+
 
 ```bash
 
-# base only — no segmentation backend
-
-docker build -t lift .
-
- 
-
-# CPU: cellpose-v3, no GPU needed
+# CPU segmentation only
 
 docker build --build-arg EXTRAS="cp-v3" -t lift-cpu .
 
- 
 
-# GPU: cellpose-SAM, requires NVIDIA container runtime
+
+# GPU segmentation + trackastra, no spotiflow — not something a fixed preset could offer
 
 docker build \
 
-  --build-arg BASE_IMAGE=nvidia/cuda:12.1.0-runtime-ubuntu22.04 \
+  --build-arg BASE=krijns/lift:gpu-base \
 
-  --build-arg EXTRAS="cp-sam" \
+  --build-arg EXTRAS="cp-sam,trackastra" \
 
   -t lift-gpu .
 
- 
 
-# full: everything available in Docker (elastix/NGMA/NND are Windows-only, excluded — see Platform support above)
+
+# everything available in Docker (elastix/NGMA/NND are Windows-only, excluded — see Platform support above)
 
 docker build \
 
-  --build-arg BASE_IMAGE=nvidia/cuda:12.1.0-runtime-ubuntu22.04 \
+  --build-arg BASE=krijns/lift:gpu-base \
 
   --build-arg EXTRAS="cp-sam,trackastra,spotiflow" \
 
   -t lift-full .
 
- 
-
-# custom combination
-
-docker build --build-arg EXTRAS="cp-v3,trackastra" -t lift-custom .
-
 ```
 
- 
+
+
+This is fast — Docker pulls `krijns/lift:cpu-base`/`gpu-base` once, caches it, and each build after that just adds a single `pip install` layer on top.
+
+
 
 ### Running
 
- 
 
-Mount your data folder into `/data` and pass the same commands as the CLI. Examples below use the locally built tags (`lift-cpu`, `lift-gpu`) — swap in `<dockerhub-user>/lift:cpu` etc. if you pulled from Docker Hub instead, the usage is identical:
 
- 
+Mount your data folder into `/data` and pass the same commands as the CLI:
+
+
 
 ```bash
 
@@ -378,25 +343,25 @@ Mount your data folder into `/data` and pass the same commands as the CLI. Examp
 
 docker run --rm -v $(pwd)/data:/data lift-cpu init /data/experiment_name
 
- 
+
 
 # run all steps
 
 docker run --rm -v $(pwd)/data:/data lift-cpu run /data/experiment_name
 
- 
+
 
 # run specific steps
 
 docker run --rm -v $(pwd)/data:/data lift-cpu run /data/experiment_name --steps 5 6
 
- 
+
 
 # GPU run
 
 docker run --rm --gpus all -v $(pwd)/data:/data lift-gpu run /data/experiment_name
 
- 
+
 
 # check installed packages
 
@@ -404,11 +369,11 @@ docker run --rm lift-cpu info
 
 ```
 
- 
+
 
 On Windows use `%cd%` instead of `$(pwd)`:
 
- 
+
 
 ```bash
 
@@ -416,54 +381,41 @@ docker run --rm -v %cd%/data:/data lift-cpu run /data/experiment_name
 
 ```
 
- 
+
 
 ### Using docker compose
 
- 
 
-The `docker-compose.yml` defines three pre-configured profiles (`cpu`, `gpu`, `full`) and a `custom` profile driven by environment variables:
-
- 
 
 ```bash
 
-# build a profile
+# build your combination (any BASE + EXTRAS you want)
 
-docker compose --profile cpu build
+BASE=krijns/lift:gpu-base EXTRAS=cp-sam,trackastra docker compose --profile custom build custom
 
-docker compose --profile gpu build
+docker run --rm --gpus all -v $(pwd)/data:/data lift-custom run /data/experiment_name
 
- 
 
-# run
 
-docker compose --profile cpu  run cpu  run /data/experiment_name
+# maintainer-only: rebuild the images that get pushed to Docker Hub
 
-docker compose --profile gpu  run gpu  run /data/experiment_name
-
-docker compose --profile full run full run /data/experiment_name --steps 5 6
-
- 
-
-# custom combination via environment variables
-
-BASE_IMAGE=python:3.11-slim EXTRAS=cp-v3,trackastra docker compose --profile custom build custom
-
-docker compose --profile custom run custom run /data/experiment_name
+docker compose --profile build-base build
 
 ```
 
- 
+
 
 ### Notes
 
- 
 
-**NVIDIA runtime** is required for GPU images. Install [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) and ensure `nvidia-smi` works inside a container before using the GPU profiles.
 
- 
-**Image sizes**: the GPU images are large (~5–8 GB) due to the CUDA base and torch. The CPU image with `cp-v3` is around 3 GB. Build once and reuse.
+**NVIDIA runtime** is required for GPU images. Install [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) and ensure `nvidia-smi` works inside a container before using GPU builds.
+
+
+
+**Image sizes**: the GPU base is large (~5–8 GB) due to the CUDA base and torch. The CPU base is around 1–2 GB. Extras add a small amount on top since the base is cached.
+
+
 
 ---
 
@@ -555,6 +507,9 @@ Optional preprocessing for registration: `wavelet_denoise`, `threshold`, `DOG_fi
 | `GNN` | Global Nearest Neighbour |
 | `NGMA` | Non-iterative Greedy Multi-frame Assignment |
 | `trackastra` | deep-learning tracker |
+
+### Note
+Both pre-compiled helper images for NND and NGMA tracking are hosted on [Zenodo Sandbox](https://sandbox.zenodo.org/records/547985).
 
 ---
 
