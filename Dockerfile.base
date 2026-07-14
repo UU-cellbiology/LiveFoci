@@ -1,0 +1,18 @@
+ARG BASE_IMAGE=python:3.11-slim
+FROM ${BASE_IMAGE}
+
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    libgl1 \
+    libglib2.0-0 \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# installed from PyPI, not the local source tree — this image IS the
+# published base, so it should track the released package, not whatever
+# happens to be sitting in the build context
+RUN pip install --no-cache-dir live-foci
+
+VOLUME ["/data"]
+ENTRYPOINT ["lift"]
+CMD ["--help"]

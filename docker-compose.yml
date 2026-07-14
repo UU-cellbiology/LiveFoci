@@ -1,60 +1,37 @@
 version: "3.9"
 
-x-lift-base: &lift-base
-  build:
-    context: .
-    dockerfile: Dockerfile
-  volumes:
-    - ./data:/data
-
 services:
 
-  cpu:
-    <<: *lift-base
+  # ── maintainer-only: builds the images that get pushed to Docker Hub ──────
+  # Most users never touch this profile.
+  cpu-base:
     build:
       context: .
+      dockerfile: Dockerfile.base
       args:
         BASE_IMAGE: python:3.11-slim
-        EXTRAS: "cp-v3"
-    profiles: [cpu]
+    image: <dockerhub-user>/lift:cpu-base
+    profiles: [build-base]
 
-  gpu:
-    <<: *lift-base
+  gpu-base:
     build:
       context: .
+      dockerfile: Dockerfile.base
       args:
         BASE_IMAGE: nvidia/cuda:12.1.0-runtime-ubuntu22.04
-        EXTRAS: "cp-sam"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    profiles: [gpu]
+    image: <dockerhub-user>/lift:gpu-base
+    profiles: [build-base]
 
-  full:
-    <<: *lift-base
-    build:
-      context: .
-      args:
-        BASE_IMAGE: nvidia/cuda:12.1.0-runtime-ubuntu22.04
-        EXTRAS: "cp-sam,trackastra,spotiflow,elastix"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    profiles: [full]
-
+  # ── everyone else: build your own combo on top of a published base ────────
+  # Fast — the base is pulled once and cached; this just adds one pip layer.
+  # Any EXTRAS combination works, not just a fixed preset.
   custom:
-    <<: *lift-base
     build:
       context: .
       args:
-        BASE_IMAGE: ${BASE_IMAGE:-python:3.11-slim}
+        BASE: ${BASE:-<dockerhub-user>/lift:cpu-base}
         EXTRAS: ${EXTRAS:-}
+    image: lift-custom
+    volumes:
+      - ./data:/data
     profiles: [custom]
