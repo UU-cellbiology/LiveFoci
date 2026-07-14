@@ -8,12 +8,11 @@ level. Keeping it lazy here means `import lift.general_utils` alone
 doesn't force torch to load.
 """
 
-from lift.general_utils.params_utils import load_params, save_params, yaml_path
+from lift.general_utils.params_utils import load_params, save_section, yaml_path
 from lift.general_utils.load_sequence import load
-from lift.general_utils.result_utils import extract_tracking_info
 
 __all__ = [
-    "load_params", "save_params", "yaml_path",
+    "load_params", "save_section", "yaml_path",
     "load", "extract_tracking_info", "wavelets",
 ]
 

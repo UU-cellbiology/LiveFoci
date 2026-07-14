@@ -3,6 +3,74 @@
 import importlib
 
 
+# ── externally-hosted binary bundles (NGMA_utils / NND_utils) ────────────────
+#
+# These bundle a full JRE + jars each (~150MB) — too large for the pip
+# package, so they're hosted on Zenodo instead and downloaded once into a
+# local cache on first use.
+
+
+_ZENODO_HOST = "sandbox.zenodo.org"  
+_ZENODO_RECORD_ID = "547985"         
+_BINARY_BASE_URL = f"https://{_ZENODO_HOST}/records/{_ZENODO_RECORD_ID}/files"
+
+_BINARY_ARCHIVES = {
+    "NGMA_utils": f"{_BINARY_BASE_URL}/NGMA_utils.tar.gz?download=1",
+    "NND_utils":  f"{_BINARY_BASE_URL}/NND_utils.tar.gz?download=1",
+}
+
+
+def _ensure_binary_utils(name: str):
+    """
+    Download and cache one of the externally-hosted binary bundles on first
+    use. Returns its local path (a pathlib.Path). Subsequent calls reuse the
+    cached copy without re-downloading.
+
+    name: "NGMA_utils" | "NND_utils"
+    """
+    import tarfile
+    import urllib.request
+    from pathlib import Path
+
+    if name not in _BINARY_ARCHIVES:
+        raise ValueError(
+            f"Unknown binary bundle: {name!r}. Available: {list(_BINARY_ARCHIVES)}"
+        )
+
+    cache_dir = Path.home() / ".lift-foci" / name
+    if cache_dir.exists():
+        return cache_dir
+
+    cache_dir.parent.mkdir(parents=True, exist_ok=True)
+    archive_path = cache_dir.parent / f"{name}.tar.gz"
+    url = _BINARY_ARCHIVES[name]
+
+    print(f"\n{name} tracker needs its bundled Java tracker — "
+          f"downloading once to {cache_dir} ...")
+    try:
+        urllib.request.urlretrieve(url, archive_path)
+    except Exception as e:
+        raise RuntimeError(
+            f"\nCouldn't download {name} from {url}: {e}\n"
+            "Check your network connection, or download it manually and "
+            f"extract it to {cache_dir}\n"
+        ) from None
+
+    print("Download complete, extracting...")
+    with tarfile.open(archive_path) as tar:
+        tar.extractall(cache_dir.parent)
+    archive_path.unlink()
+
+    if not cache_dir.exists():
+        raise RuntimeError(
+            f"Extraction of {archive_path} didn't produce the expected "
+            f"{cache_dir} — check the archive's internal folder structure."
+        )
+
+    print(f"{name} ready at {cache_dir}\n")
+    return cache_dir
+
+
 # ── core guard ────────────────────────────────────────────────────────────────
 
 def _require(package, extra, what, min_version=None, max_version=None, install_name=None):
@@ -25,7 +93,7 @@ def _require(package, extra, what, min_version=None, max_version=None, install_n
     except ImportError:
         raise ImportError(
             f"\n{what} requires '{pip_name}', which is not installed.\n"
-            f"Install it with:  pip install \"LiFT[{extra}]\"\n"
+            f"Install it with:  pip install \"lift-foci[{extra}]\"\n"
         ) from None
 
     if min_version is not None or max_version is not None:
@@ -45,13 +113,13 @@ def _require(package, extra, what, min_version=None, max_version=None, install_n
             raise ImportError(
                 f"\n{what} requires '{pip_name}'>={min_str}, "
                 f"but you have {raw}.\n"
-                f"Upgrade with:  pip install \"LiFT[{extra}]\"\n"
+                f"Upgrade with:  pip install \"lift-foci[{extra}]\"\n"
             ) from None
         if max_version and version >= max_version:
             raise ImportError(
                 f"\n{what} requires '{pip_name}'<{max_str}, "
                 f"but you have {raw}.\n"
-                f"Install the correct version with:  pip install \"LiFT[{extra}]\"\n"
+                f"Install the correct version with:  pip install \"lift-foci[{extra}]\"\n"
             ) from None
 
     return mod
@@ -103,11 +171,18 @@ def _require_spotiflow():
     )
 
 def _require_elastix():
-    return _require(
-        "itk", "elastix", "Elastix registration",
-        min_version=(0, 19),
-        install_name="itk-elastix",
-    )
+    """Elastix registration wraps a bundled Windows `elastix.exe` binary via
+    subprocess — it does not use the `itk`/`itk-elastix` Python package, so
+    there's nothing to pip-install here. This is a platform check, not a
+    dependency check. Experimental / Windows-only for now."""
+    import os
+    if os.name != "nt":
+        raise RuntimeError(
+            "\nElastix registration is Windows-only (it shells out to a bundled "
+            "elastix.exe) and experimental — it is not available on this platform "
+            "or in the Docker images.\n"
+            "Use method='stackreg' instead, or run natively on Windows.\n"
+        )
 
 def _require_torch():
     return _require(
@@ -125,8 +200,8 @@ def _detect_seg_method():
         raise ImportError(
             "\nNo segmentation backend is installed.\n"
             "Install one with:\n"
-            "  pip install \"LiFT[cp-sam]\"   # cellpose >= 4.0 (recommended)\n"
-            "  pip install \"LiFT[cp-v3]\"    # cellpose >= 3.0, < 4.0\n"
+            "  pip install \"lift-foci[cp-sam]\"   # cellpose >= 4.0 (recommended)\n"
+            "  pip install \"lift-foci[cp-v3]\"    # cellpose >= 3.0, < 4.0\n"
         )
     if v >= (4, 0):
         return "cellpose_sam"
@@ -135,8 +210,8 @@ def _detect_seg_method():
     raise ImportError(
         f"\nInstalled cellpose {'.'.join(str(x) for x in v)} is too old.\n"
         "Install a supported version with:\n"
-        "  pip install \"LiFT[cp-sam]\"   # cellpose >= 4.0 (recommended)\n"
-        "  pip install \"LiFT[cp-v3]\"    # cellpose >= 3.0, < 4.0\n"
+        "  pip install \"lift-foci[cp-sam]\"   # cellpose >= 4.0 (recommended)\n"
+        "  pip install \"lift-foci[cp-v3]\"    # cellpose >= 3.0, < 4.0\n"
     )
 
 
@@ -162,10 +237,14 @@ def _detect_foci_detector():
 
 
 def _detect_registration_method():
-    """Return best available registration method."""
-    if _probe_version("itk") is not None:
-        return "elastix"
-    return "stackreg"   # always available, no optional dep
+    """Return best available registration method.
+
+    'elastix' is intentionally never auto-selected here: it's Windows-only
+    and experimental (see _require_elastix). Users who specifically want it
+    must opt in explicitly via parameters.yml (step4_registration.method:
+    elastix) on a Windows machine.
+    """
+    return "stackreg"   # always available, portable
 
 
 # ── segmentation factory ──────────────────────────────────────────────────────

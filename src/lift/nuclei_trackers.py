@@ -255,19 +255,23 @@ class NND_tracker(object):
         super().__init__() 
 
         self.mm = motion_model
-        
-        #get directory for this class
-        self.base_dir =  Path(__file__).parent.resolve()  #Path.cwd()  #
+
+        # was: self.base_dir = Path(__file__).parent.resolve()
+        # NND_utils no longer ships inside the package — it's downloaded
+        # into a local cache on first use instead (see _ensure_binary_utils
+        # in _helpers.py).
+        from lift._helpers import _ensure_binary_utils
+        self.base_dir = _ensure_binary_utils("NND_utils")
 
         if os.name == "nt":  # command for windows
-            self.java = self.base_dir / "NND_utils" / "ImageJ" / "jre" / "bin" / "java.exe"
+            self.java = self.base_dir / "ImageJ" / "jre" / "bin" / "java.exe"
             self.classpath_sep = ";"
         else:  # command for other systems
-            self.java = self.base_dir / "NND_utils" / "ImageJ" / "jre" / "bin" / "java"
+            self.java = self.base_dir / "ImageJ" / "jre" / "bin" / "java"
             self.classpath_sep = ":"
                             
         # location of the java tracking plugin
-        self.TP_dir = self.base_dir / "NND_utils" / "SOSTracker commandline"
+        self.TP_dir = self.base_dir / "SOSTracker commandline"
 
         # Classpath jars
         jars = ["VENI_.jar", "ij.jar", "imagescience.jar", "Jama-1.0.2.jar"]
@@ -521,4 +525,3 @@ class trackastra_tracker(object):
             old_name = outdir / f"man_track{t:04d}.tif"
             new_name = outdir / f"t{t:04d}.tif"
             os.replace(old_name, new_name)
-            

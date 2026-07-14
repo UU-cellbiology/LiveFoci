@@ -352,19 +352,22 @@ class NGMA_track(object):
         self.buffer_size = gap_closing + 2
         self.mm = motion_model   
         
-        
-        #get directory for this class
-        self.base_dir =  Path(__file__).parent.resolve()  #Path.cwd()  
+        # was: self.base_dir = Path(__file__).parent.resolve()
+        # NGMA_utils no longer ships inside the package — it's downloaded
+        # into a local cache on first use instead (see _ensure_binary_utils
+        # in _helpers.py).
+        from lift._helpers import _ensure_binary_utils
+        self.base_dir = _ensure_binary_utils("NGMA_utils")
 
         if os.name == "nt":  # command for windows
-            self.java = self.base_dir / "NGMA_utils" / "ImageJ" / "jre" / "bin" / "java.exe"
+            self.java = self.base_dir / "ImageJ" / "jre" / "bin" / "java.exe"
             self.classpath_sep = ";"
         else:  # command for other systems
-            self.java = self.base_dir / "NGMA_utils" / "ImageJ" / "jre" / "bin" / "java"
+            self.java = self.base_dir / "ImageJ" / "jre" / "bin" / "java"
             self.classpath_sep = ":"
                             
         # location of the java tracking plugin
-        self.TP_dir = self.base_dir / "NGMA_utils" / "SOSTracker commandline"
+        self.TP_dir = self.base_dir / "SOSTracker commandline"
 
         # Classpath jars
         jars = ["VENI_.jar", "ij.jar", "imagescience.jar", "Jama-1.0.2.jar"]
@@ -591,6 +594,3 @@ class trackastra_tracker(object):
                 mask_stack[tt, ys, xs] = labels
         
         return mask_stack
-
-
-
