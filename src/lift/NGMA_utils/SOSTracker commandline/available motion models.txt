@@ -1,8 +1,0 @@
-'method' is :
-	0 - Gready Nearest Neighbor (Diffusion)
-	1 - Gready Nearest Neighbor (Almost constant velocity
-	2 - Global Nearest Neighbor
-	3 - 4-D Noniterative Greedy Multiframe Assignment
-	4 - Lagrangian Relaxation
-	5 - 2-D Kalman Filter Noniterative Greedy Multiframe Assignment
-	6 - Global nearest meighbor with IMM Filter
