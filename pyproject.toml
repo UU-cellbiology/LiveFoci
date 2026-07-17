@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "live-foci"
-version = "1.0.0"
+version = "1.0.1"
 authors = [
     { name = "Tijmen H. de Wolf", affiliation = "Erasmus MC Cancer Institute, University Medical Center Rotterdam" },
     { name = "Krijn H. van der Steen", affiliation = "University Medical Center Utrecht, Lab of Cellular Disease Models" },
@@ -53,4 +53,6 @@ include = [
     "pyproject.toml",
     "README.md",
     "LICENSE",
+    "logo.png",
+    "pipeline_schematic.png",
 ]

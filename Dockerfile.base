@@ -6,12 +6,35 @@ RUN apt-get update && apt-get install -y \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \
+    default-jre \
     && rm -rf /var/lib/apt/lists/*
 
 # installed from PyPI, not the local source tree — this image IS the
 # published base, so it should track the released package, not whatever
 # happens to be sitting in the build context
 RUN pip install --no-cache-dir live-foci
+
+# ── Linux/ARM fix for the ImageJ trackers (NND_utils + NGMA_utils) ────────
+# Both bundles that lift fetches ship a *Windows* ImageJ + JRE, and the
+# trackers call .../<bundle>/ImageJ/jre/bin/java, which can't run on Linux.
+# The system `default-jre` above is Java 11/17 (wrong version for the classic
+# ImageJ macros), so we add a matching Linux Java 8, pre-seed both bundles so
+# the runtime download is skipped, and point each bundled `jre` at Java 8.
+# Bytecode (ij.jar/macros/plugins) is untouched.
+COPY --from=eclipse-temurin:8-jre /opt/java/openjdk /opt/java/openjdk
+ARG ZENODO="https://sandbox.zenodo.org/records/547985/files"
+RUN set -eux; \
+    mkdir -p /root/.lift-foci; \
+    for b in NND_utils NGMA_utils; do \
+        python3 -c "import urllib.request,sys; urllib.request.urlretrieve(sys.argv[1], sys.argv[2])" \
+            "${ZENODO}/${b}.tar.gz?download=1" "/tmp/${b}.tar.gz"; \
+        tar -xzf "/tmp/${b}.tar.gz" -C /root/.lift-foci; \
+        rm "/tmp/${b}.tar.gz"; \
+    done; \
+    find /root/.lift-foci -type d -name jre | while read -r d; do \
+        rm -rf "$d"; ln -s /opt/java/openjdk "$d"; \
+    done; \
+    for j in $(find /root/.lift-foci -path '*/jre/bin/java'); do "$j" -version; done
 
 VOLUME ["/data"]
 ENTRYPOINT ["lift"]

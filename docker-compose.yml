@@ -10,7 +10,7 @@ services:
       dockerfile: Dockerfile.base
       args:
         BASE_IMAGE: python:3.11-slim
-    image: <dockerhub-user>/lift:cpu-base
+    image: krijns/lift:cpu-base
     profiles: [build-base]
 
   gpu-base:
@@ -19,7 +19,7 @@ services:
       dockerfile: Dockerfile.base
       args:
         BASE_IMAGE: nvidia/cuda:12.1.0-runtime-ubuntu22.04
-    image: <dockerhub-user>/lift:gpu-base
+    image: krijns/lift:gpu-base
     profiles: [build-base]
 
   # ── everyone else: build your own combo on top of a published base ────────
@@ -29,7 +29,7 @@ services:
     build:
       context: .
       args:
-        BASE: ${BASE:-<dockerhub-user>/lift:cpu-base}
+        BASE: ${BASE:-krijns/lift:cpu-base}
         EXTRAS: ${EXTRAS:-}
     image: lift-custom
     volumes:
