@@ -99,7 +99,8 @@ def stackreg_registration(stack, preproc_func=None):
     else:  
         registered_stack = sr.register_transform_stack(stack, reference='previous')
     
-    registered_stack = np.clip(to_uint16(registered_stack), 0, 255).astype(np.uint8)
+    info = np.iinfo(stack.dtype)
+    registered_stack = np.clip(to_uint16(registered_stack), info.min, info.max).astype(stack.dtype)
 
     return registered_stack
 
@@ -189,13 +190,15 @@ class ElastixReg(object):
             (self.out_dir / "result.0.tif").replace(self.fixed)
 
             # process the registered image again and update the temporary processed images
-            if self.preproc_function:  
-                processed_reg = wavelet_denoise([np.clip(registered_image, 0, 255).astype(np.uint8)])
+            if self.preproc_function:
+                _info = np.iinfo(img_stack.dtype)
+                processed_reg = wavelet_denoise([np.clip(registered_image, _info.min, _info.max).astype(img_stack.dtype)])
                 skimage.io.imsave(self.fixed_processed, processed_reg, check_contrast=False)
                 skimage.io.imsave(self.moving_processed, processed_stack[tt+1], check_contrast=False)  
         
         elastix_reg = np.stack(elastix_reg)
-        elastix_reg = np.clip(elastix_reg, 0, 255).astype(np.uint8)
+        _info = np.iinfo(img_stack.dtype)
+        elastix_reg = np.clip(elastix_reg, _info.min, _info.max).astype(img_stack.dtype)
 
         # remove the files of the previous transforms
         for f in self.transform_loc.glob("TransformParameters.*.txt"):

@@ -199,14 +199,20 @@ def wavelet_filtering(I, **kwargs):
     factor = kwargs.pop("w_factor", 2.2)
     start_scale = kwargs.pop("start_scale", 2)
 
-    W, I = wavelet_filter.wavelets(I, scales=scales)       
+    input_dtype = I.dtype  # capture before wavelet overwrites I with a list of float32 arrays
+    W, I = wavelet_filter.wavelets(I, scales=scales)
     for w in W:
       threshold = factor * (np.std(w))**2
       w[w**2 > threshold] = 0
     coefs = np.sum(np.stack(W[start_scale:]),0)
     recon = I[-1] + coefs
 
-    recon = skimage.util.img_as_ubyte(recon/recon.max())
+    if input_dtype == np.uint8:
+        # preserve existing behaviour so 8-bit segmentation results are unchanged
+        recon = skimage.util.img_as_ubyte(recon / recon.max())
+    else:
+        # for 16-bit (or float) input, return float32 [0, 1]; Cellpose accepts this natively
+        recon = (recon / recon.max()).astype(np.float32)
 
     return recon
     

@@ -32,13 +32,21 @@ def run_detector_stack(stack, detector, threshold, return_segmentation=False):
         coords, enhanced, labels = detector.detect(frame, threshold, return_segmentation)
         y, x = coords[:,0], coords[:,1]
 
-        if coords.size > 0: 
+        if coords.size > 0:
             intensities = frame[coords[:, 0].astype(int), coords[:, 1].astype(int)]
-            coords_with_t = np.column_stack([x, y, 
-                                             np.full(len(coords), tt), 
-                                             intensities])
+            if return_segmentation and labels is not None:
+                props_by_label = {p.label: p for p in skimage.measure.regionprops(labels, intensity_image=frame)}
+                
+                n = len(coords)
+                sizes     = np.array([props_by_label[k].area if k in props_by_label else 0.0 for k in range(1, n + 1)], dtype=float)
+                mean_ints = np.array([props_by_label[k].mean_intensity if k in props_by_label else 0.0 for k in range(1, n + 1)], dtype=float)
+                coords_with_t = np.column_stack([x, y, np.full(n, tt), intensities, sizes, mean_ints])
+            else:
+                coords_with_t = np.column_stack([x, y,
+                                                 np.full(len(coords), tt),
+                                                 intensities])
         else:
-            coords_with_t = np.empty((0, 4))
+            coords_with_t = np.empty((0, 6 if return_segmentation else 4))
         detections.append(coords_with_t)
 
         enhanced_stack.append(enhanced)

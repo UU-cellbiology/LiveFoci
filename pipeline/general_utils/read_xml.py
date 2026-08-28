@@ -1,6 +1,6 @@
 import numpy as np
 from pathlib import Path
-from xml.dom import minidom 
+from xml.dom import minidom
 import re
 
 def extract_tracking_info(paths, num_frames, dt, track_filter="no filter"):
@@ -80,8 +80,115 @@ def extract_tracking_info(paths, num_frames, dt, track_filter="no filter"):
 
     TL_all = [tl for TL_cell in results_dict["track_lengths"] for tl in TL_cell]  # collect all track lengths
     AT_all = np.vstack(results_dict["active_tracks"])  # collect the number of active tracks
-    
+
     print(f"avg active tracks per cell: {np.nanmean(AT_all)}")
     print(f"avg track length in minutes: {np.mean(TL_all)}")
-            
+
     return TL_all, AT_all, results_dict
+
+
+def extract_tracking_features(paths, num_frames, track_filter="no filter"):
+    """
+    Read per-detection intensity, size, and mean_intensity from enriched tracks.xml files.
+
+    Applies the same track filtering as extract_tracking_info so that only tracks
+    included in the active-track count also contribute to the feature averages.
+
+    Parameters
+    ----------
+    paths : list of Path
+        Same list passed to extract_tracking_info — paths to per-nucleus directories.
+    num_frames : int
+        Total number of frames in the time-lapse.
+    track_filter : {"no filter", "exclude partial", "pass t0"}
+        Same meaning as in extract_tracking_info.
+
+    Returns
+    -------
+    intensity_arr : ndarray (cells × frames) or None
+        Mean peak intensity per frame. None if the XML has no 'intensity' attribute
+        (i.e. tracks.xml was produced before feature enrichment was added).
+    size_arr : ndarray (cells × frames) or None
+        Mean spot size (watershed area, pixels) per frame. None if unavailable.
+    mean_intensity_arr : ndarray (cells × frames) or None
+        Mean intensity averaged over the spot area per frame. None if unavailable.
+    """
+    VALID_FILTERS = ["no filter", "exclude partial", "pass t0"]
+    if track_filter not in VALID_FILTERS:
+        raise ValueError(f"track_filter must be one of {VALID_FILTERS}")
+
+    intensity_all   = []
+    size_all        = []
+    mean_int_all    = []
+    found_intensity = False
+    found_size      = False
+
+    for nuc_dir in paths:
+        nuc_dir = Path(nuc_dir)
+
+        tif_path = list(nuc_dir.glob("I_*.tif"))[0]
+        numbers = re.findall(r'\d+', str(tif_path))
+        frame_start = int(numbers[-2])
+        frame_end   = int(numbers[-1])
+
+        intensity_sum = np.zeros(num_frames)
+        size_sum      = np.zeros(num_frames)
+        mean_int_sum  = np.zeros(num_frames)
+        count         = np.zeros(num_frames, dtype=int)
+
+        features_xml = nuc_dir / "tracks_features.xml"
+        if not features_xml.exists():
+            intensity_all.append(np.full(num_frames, np.nan))
+            size_all.append(np.full(num_frames, np.nan))
+            mean_int_all.append(np.full(num_frames, np.nan))
+            continue
+
+        tree = minidom.parse(str(features_xml))
+        for pt in tree.getElementsByTagName('particle'):
+            detections = pt.getElementsByTagName('detection')
+            t_start = int(detections[0].getAttribute('t'))
+            t_end   = int(detections[-1].getAttribute('t'))
+
+            is_partial            = (t_start == 0) or ((t_end + frame_start) == frame_end)
+            starts_at_movie_start = (t_start == 0 and frame_start == 0)
+
+            if track_filter == "no filter":
+                include_track = True
+            elif track_filter == "exclude partial":
+                include_track = not is_partial
+            elif track_filter == "pass t0":
+                include_track = (not is_partial) or starts_at_movie_start
+
+            if not include_track:
+                continue
+
+            for det in detections:
+                g = int(det.getAttribute('t')) + frame_start
+                if 0 <= g < num_frames:
+                    if det.hasAttribute('intensity'):
+                        found_intensity = True
+                        intensity_sum[g] += float(det.getAttribute('intensity'))
+                    if det.hasAttribute('size'):
+                        found_size = True
+                        size_sum[g]     += float(det.getAttribute('size'))
+                        mean_int_sum[g] += float(det.getAttribute('mean_intensity'))
+                    count[g] += 1
+
+        safe = np.where(count > 0, count, 1)
+        intensity_frame  = np.where(count > 0, intensity_sum  / safe, np.nan)
+        size_frame       = np.where(count > 0, size_sum        / safe, np.nan)
+        mean_int_frame   = np.where(count > 0, mean_int_sum   / safe, np.nan)
+
+        for arr in (intensity_frame, size_frame, mean_int_frame):
+            arr[:frame_start]    = np.nan
+            arr[frame_end + 1:]  = np.nan
+
+        intensity_all.append(intensity_frame)
+        size_all.append(size_frame)
+        mean_int_all.append(mean_int_frame)
+
+    intensity_arr      = np.vstack(intensity_all)  if found_intensity else None
+    size_arr           = np.vstack(size_all)        if found_size      else None
+    mean_intensity_arr = np.vstack(mean_int_all)    if found_size      else None
+
+    return intensity_arr, size_arr, mean_intensity_arr

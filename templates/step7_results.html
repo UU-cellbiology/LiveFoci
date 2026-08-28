@@ -92,7 +92,7 @@
                    value="15" min="0" step="1">
           </div>
         </div>
-        <div class="row g-2 align-items-center">
+        <div class="row g-2 align-items-center mb-2">
           <div class="col param-label">
             Remove final frames
             <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
@@ -101,6 +101,20 @@
           <div class="col-5">
             <input type="number" class="form-control form-control-sm" id="remove_final_frames"
                    value="4" min="0" step="1">
+          </div>
+        </div>
+        <div class="row g-2 align-items-center">
+          <div class="col param-label">
+            Variation band
+            <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip"
+               title="Shaded band drawn around the mean line in the active-tracks, spot intensity, and spot area plots. SEM = standard error of the mean; SD = standard deviation; None = no band."></i>
+          </div>
+          <div class="col-5">
+            <select class="form-select form-select-sm" id="error_band">
+              <option value="sem" selected>SEM</option>
+              <option value="std">SD</option>
+              <option value="">None</option>
+            </select>
           </div>
         </div>
       </div>
@@ -237,6 +251,16 @@
           <div>
             <p class="param-label mb-1">Dwell-time distribution (violin)</p>
             <img id="imgViolin" class="plot-img" src="" alt="">
+          </div>
+          <div id="featurePlotsSection" style="display:none">
+            <div class="mb-3">
+              <p class="param-label mb-1">Mean spot intensity over time</p>
+              <img id="imgIntensity" class="plot-img" src="" alt="">
+            </div>
+            <div>
+              <p class="param-label mb-1">Mean spot area over time</p>
+              <img id="imgSize" class="plot-img" src="" alt="">
+            </div>
           </div>
         </div>
       </div>
@@ -407,6 +431,7 @@
           dt:                   parseFloat(document.getElementById('dt').value),
           time_offset:          parseFloat(document.getElementById('time_offset').value),
           remove_final_frames:  parseInt(document.getElementById('remove_final_frames').value),
+          error_band:           document.getElementById('error_band').value,
           foci_max:             parseFloat(document.getElementById('foci_max').value),
           max_bin:              parseInt(document.getElementById('max_bin').value),
           percent_max:          parseFloat(document.getElementById('percent_max').value),
@@ -425,6 +450,13 @@
       document.getElementById('imgAT').src     = 'data:image/png;base64,' + data.png_at;
       document.getElementById('imgHist').src   = 'data:image/png;base64,' + data.png_hist;
       document.getElementById('imgViolin').src = 'data:image/png;base64,' + data.png_violin;
+      if (data.has_features && data.png_mean_intensity) {
+        document.getElementById('imgIntensity').src = 'data:image/png;base64,' + data.png_mean_intensity;
+        document.getElementById('imgSize').src      = 'data:image/png;base64,' + data.png_size;
+        document.getElementById('featurePlotsSection').style.display = '';
+      } else {
+        document.getElementById('featurePlotsSection').style.display = 'none';
+      }
       document.getElementById('plotsCard').style.display = '';
 
       // enable stats button now that plots are ready

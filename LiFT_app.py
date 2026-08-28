@@ -986,7 +986,7 @@ def discover_conditions():
 @app.route('/api/generate_plots', methods=['POST'])
 def generate_plots():
     from pipeline.general_utils import plot_utils
-    from pipeline.general_utils.read_xml import extract_tracking_info
+    from pipeline.general_utils.read_xml import extract_tracking_info, extract_tracking_features
 
     data         = request.get_json()
     data_path    = Path(data.get('data_path', DEFAULT_DATA_PATH))
@@ -995,6 +995,7 @@ def generate_plots():
     dt           = float(data.get('dt', 5))
     time_offset  = float(data.get('time_offset', 0))
     remove_final = int(data.get('remove_final_frames', 0))
+    error_band   = data.get('error_band', 'sem') or None
     foci_max     = float(data.get('foci_max', 25))
     max_bin      = int(data.get('max_bin', 300))
     percent_max  = float(data.get('percent_max', 13))
@@ -1014,12 +1015,17 @@ def generate_plots():
                 continue
             TL, AT, _ = extract_tracking_info(paths, num_frames, dt,
                                               track_filter=track_filter)
+            intensity_arr, size_arr, mean_int_arr = extract_tracking_features(paths, num_frames,
+                                                                              track_filter=track_filter)
             color = cond.get('color', '#1f77b4')
             fill  = cond.get('fill', False)
             plot_samples.append({
                 'name':          cond.get('name', tag),
                 'active_tracks': AT,
                 'track_lengths': TL,
+                'intensity':     intensity_arr,
+                'size':          size_arr,
+                'mean_intensity': mean_int_arr,
                 'color':         color,
                 'linestyle':     cond.get('linestyle', 'solid'),
                 'alpha':         float(cond.get('alpha', 0.8)),
@@ -1037,7 +1043,7 @@ def generate_plots():
 
         # active tracks over time 
         fig1, ax1 = plt.subplots(figsize=(7, 4))
-        plot_utils.plot_AT(shifted_time, plot_samples, remove_final_frames=remove_final, ax=ax1)
+        plot_utils.plot_AT(shifted_time, plot_samples, remove_final_frames=remove_final, error_band=error_band, ax=ax1)
         ax1.set_xlim(0, num_frames * dt / 60)
         ax1.set_ylim(0, foci_max)
         fig1.tight_layout()
@@ -1050,19 +1056,44 @@ def generate_plots():
         fig2.tight_layout()
         png_hist = _fig_to_b64(fig2)
 
-        # violin 
+        # violin
         fig3, ax3 = plt.subplots(figsize=(7, 4))
         plot_utils.plot_violin(plot_samples, max_bin, ax=ax3)
         fig3.tight_layout()
         png_violin = _fig_to_b64(fig3)
 
+        # feature plots (only when enriched XML data is available)
+        has_features = any(s.get('mean_intensity') is not None for s in plot_samples)
+        png_mean_intensity = png_size = None
+        if has_features:
+            fig4, ax4 = plt.subplots(figsize=(7, 4))
+            plot_utils.plot_feature('mean_intensity', shifted_time, plot_samples,
+                                    ylabel='Mean spot intensity [a.u.]',
+                                    remove_final_frames=remove_final,
+                                    error_band=error_band, ax=ax4)
+            ax4.set_xlim(0, num_frames * dt / 60)
+            fig4.tight_layout()
+            png_mean_intensity = _fig_to_b64(fig4)
+
+            fig5, ax5 = plt.subplots(figsize=(7, 4))
+            plot_utils.plot_feature('size', shifted_time, plot_samples,
+                                    ylabel='Mean spot area [px]',
+                                    remove_final_frames=remove_final,
+                                    error_band=error_band, ax=ax5)
+            ax5.set_xlim(0, num_frames * dt / 60)
+            fig5.tight_layout()
+            png_size = _fig_to_b64(fig5)
+
         return jsonify({
-            'success':      True,
-            'png_at':       png_at,
-            'png_hist':     png_hist,
-            'png_violin':   png_violin,
-            'n_conditions': len(plot_samples),
-            'skipped':      skipped,
+            'success':           True,
+            'png_at':            png_at,
+            'png_hist':          png_hist,
+            'png_violin':        png_violin,
+            'png_mean_intensity': png_mean_intensity,
+            'png_size':          png_size,
+            'has_features':      has_features,
+            'n_conditions':      len(plot_samples),
+            'skipped':           skipped,
         })
 
     except Exception as e:

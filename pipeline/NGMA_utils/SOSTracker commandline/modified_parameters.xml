@@ -56,13 +56,13 @@
     <parameter ID="MotionModel" value="2.0"/>
     
     
-    <parameter ID="LinkingBufferSize" value="4.0"/>
+    <parameter ID="LinkingBufferSize" value="8.0"/>
     
     
-    <parameter ID="MinimumTrackLength" value="5.0"/>
+    <parameter ID="MinimumTrackLength" value="3.0"/>
     
     
-    <parameter ID="gateDistanceDiffusion" value="5.0"/>
+    <parameter ID="gateDistanceDiffusion" value="4.0"/>
     
     
     <parameter ID="gateDistanceDirectedMotion" value="4.0"/>
