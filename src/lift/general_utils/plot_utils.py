@@ -12,7 +12,7 @@ from itertools import combinations
 ##############
 
 
-def plot_AT(shifted_time, plot_samples, remove_final_frames=0, ax=None):
+def plot_AT(shifted_time, plot_samples, remove_final_frames=0, error_band=None, ax=None):
     """
     Plot mean active tracks per cell over time.
 
@@ -25,6 +25,9 @@ def plot_AT(shifted_time, plot_samples, remove_final_frames=0, ax=None):
         name, color, linestyle.
     remove_final_frames : int
         Number of tail frames to drop (avoids artefact from min_track_length).
+    error_band : {None, "sem", "std"}, optional
+        Draw a shaded band around the mean line. "sem" draws ±SEM across cells,
+        "std" draws ±1 SD across cells. None (default) draws no band.
     ax : matplotlib Axes, optional
     """
     if ax is None:
@@ -33,13 +36,82 @@ def plot_AT(shifted_time, plot_samples, remove_final_frames=0, ax=None):
     end = len(shifted_time) - remove_final_frames if remove_final_frames > 0 else len(shifted_time)
 
     for s in plot_samples:
-        mean_at = np.nanmean(s["active_tracks"], 0)
+        AT = s["active_tracks"]
+        mean_at = np.nanmean(AT, 0)
         ax.plot(shifted_time[:end], mean_at[:end],
                 color=s["color"], label=s["name"],
                 linestyle=s.get("linestyle", "solid"))
 
+        if error_band is not None:
+            n = np.sum(~np.isnan(AT), axis=0)
+            std = np.nanstd(AT, axis=0)
+            if error_band == "sem":
+                band = std / np.sqrt(np.maximum(n, 1))
+            elif error_band == "std":
+                band = std
+            else:
+                raise ValueError(f"error_band must be None, 'sem', or 'std', got {error_band!r}")
+            ax.fill_between(shifted_time[:end], (mean_at - band)[:end], (mean_at + band)[:end], alpha=0.2, color=s["color"], lw=0)
+
     ax.set_xlabel("Time [h]")
-    ax.set_ylabel("Active tracks per cell")
+    ax.set_ylabel("Number of active\ntracks per cell")
+    ax.legend(loc="upper right")
+
+
+def plot_feature(feature_key, shifted_time, plot_samples, ylabel,
+                 remove_final_frames=0, error_band=None, ax=None):
+    """
+    Plot the mean of a per-cell per-frame feature over time.
+
+    Parameters
+    ----------
+    feature_key : str
+        Key in each plot_samples dict holding a (cells × frames) array.
+        Conditions where the key is absent or the value is None are skipped.
+    shifted_time : 1-D array
+        Time axis in hours (length = num_frames).
+    plot_samples : list of dicts
+        Each dict must have 'name', 'color', and optionally 'linestyle' and
+        the key given by feature_key.
+    ylabel : str
+        Y-axis label.
+    remove_final_frames : int
+        Number of tail frames to drop.
+    error_band : {None, "sem", "std"}, optional
+        Shaded band around the mean. "sem" = ±SEM across cells,
+        "std" = ±1 SD across cells. None draws no band.
+    ax : matplotlib Axes, optional
+    """
+    if ax is None:
+        ax = plt.gca()
+
+    end = len(shifted_time) - remove_final_frames if remove_final_frames > 0 else len(shifted_time)
+
+    for s in plot_samples:
+        data = s.get(feature_key)
+        if data is None:
+            continue
+        mean_vals = np.nanmean(data, 0)
+        ax.plot(shifted_time[:end], mean_vals[:end],
+                color=s["color"], label=s["name"],
+                linestyle=s.get("linestyle", "solid"))
+
+        if error_band is not None:
+            n = np.sum(~np.isnan(data), axis=0)
+            std = np.nanstd(data, axis=0)
+            if error_band == "sem":
+                band = std / np.sqrt(np.maximum(n, 1))
+            elif error_band == "std":
+                band = std
+            else:
+                raise ValueError(f"error_band must be None, 'sem', or 'std', got {error_band!r}")
+            ax.fill_between(shifted_time[:end],
+                            (mean_vals - band)[:end],
+                            (mean_vals + band)[:end],
+                            alpha=0.2, color=s["color"], lw=0)
+
+    ax.set_xlabel("Time [h]")
+    ax.set_ylabel(ylabel)
     ax.legend(loc="upper right")
 
 
@@ -377,7 +449,7 @@ def plot_violin_filter_modes(filter_results, filter_plot_samples, filter_modes, 
     ax.set_xticklabels(labels)
 
     ax.set_ylabel("Dwell time [min]")
-    ax.set_xlabel("Treatment condition")
+    ax.set_xlabel("Condition")
     ax.set_ylim(0, max_bin)
 
     # legend for filter modes

@@ -37,18 +37,20 @@ def run_foci_tracker(path_list, method, **kwargs):
 
     print(f"foci tracking method:     {method}\n")
 
+    save_features = kwargs.pop('save_features', True)
+
     if method=='GNN':
         max_dist = kwargs.pop("max_distance", 5.0)
         gap_close = kwargs.pop("gap_closing", 2)
         min_length = kwargs.pop("min_track_length", 3)
-        
+
         tracker = GNN_tracker(max_distance=max_dist, gap_closing=gap_close, min_track_length=min_length)
-        tracker_func = tracker.track 
+        tracker_func = tracker.track
     elif method=='NGMA':
         max_dist = kwargs.pop("max_distance", 5.0)
         gap_close = kwargs.pop("gap_closing", 3)
         min_length = kwargs.pop("min_track_length", 3)
-        
+
         tracker = NGMA_track(min_track_length=min_length, max_distance=max_dist, gap_closing=gap_close)
         tracker_func = tracker.forward
     elif method=='trackastra':
@@ -60,10 +62,18 @@ def run_foci_tracker(path_list, method, **kwargs):
     else:
         raise ValueError(f"Unknown foci tracking method: {method!r}")
 
-    for path in path_list:  
+    for path in path_list:
         path = Path(path)
         tracker_func(path)
 
+        if save_features:
+            dir_path = path.parent
+            xml_path  = dir_path / "tracks.xml"
+            det_txt   = dir_path / "detected_foci.txt"
+            if xml_path.exists() and det_txt.exists():
+                seg_tif = dir_path / "spot_segmentation.tif"
+                enrich_tracks_xml(xml_path, det_txt,
+                                  seg_tif if seg_tif.exists() else None)
 
 #####
 #
@@ -104,6 +114,80 @@ def write_isbi_xml(tracks, out_file):
     with open(out_file, "wb") as f:
         f.write(xml_str)
 
+
+def enrich_tracks_xml(xml_path, det_txt_path, seg_tif_path=None):
+    """
+    Post-process tracks.xml to add intensity, size, and mean_intensity attributes
+    to each <detection> by matching (t, x, y) back to detected_foci.txt.
+
+    When detected_foci.txt was saved with return_segmentation=True it already contains
+    size_px (col 4) and mean_intensity (col 5); otherwise those are computed from
+    spot_segmentation.tif if available.  Pass save_features=False to run_foci_tracker
+    to skip this step entirely (useful for benchmarking runs).
+    """
+    det_data = np.loadtxt(str(det_txt_path))
+    if det_data.size == 0:
+        return
+    if det_data.ndim == 1:
+        det_data = det_data.reshape(1, -1)
+
+    has_seg_cols = det_data.shape[1] >= 6
+
+    # build lookup: (t_int, x_int, y_int) -> feature dict
+    lookup = {}
+    for row in det_data:
+        key = (int(round(row[2])), int(round(row[0])), int(round(row[1])))
+        entry = {'intensity': float(row[3])}
+        if has_seg_cols:
+            entry['size'] = float(row[4])
+            entry['mean_intensity'] = float(row[5])
+        lookup[key] = entry
+
+    # if txt has only 4 cols but a seg tif exists, compute size/mean_intensity from it
+    if not has_seg_cols and seg_tif_path is not None:
+        import skimage.measure
+        seg_stack = imread(str(seg_tif_path))
+        tif_files = sorted(Path(det_txt_path).parent.glob("I_*.tif"))
+        if tif_files:
+            raw_stack = imread(str(tif_files[0]))
+            for row in det_data:
+                t_int = int(round(row[2]))
+                x_int = int(round(row[0]))
+                y_int = int(round(row[1]))
+                key = (t_int, x_int, y_int)
+                if t_int < len(seg_stack):
+                    props = skimage.measure.regionprops(seg_stack[t_int],
+                                                        intensity_image=raw_stack[t_int])
+                    for prop in props:
+                        cy, cx = prop.centroid
+                        if abs(cy - y_int) < 1.5 and abs(cx - x_int) < 1.5:
+                            lookup[key]['size'] = float(prop.area)
+                            lookup[key]['mean_intensity'] = float(prop.mean_intensity)
+                            break
+
+    # parse and enrich the XML
+    tree = minidom.parse(str(xml_path))
+    n_missed = 0
+    for det in tree.getElementsByTagName('detection'):
+        t = int(det.getAttribute('t'))
+        x = int(round(float(det.getAttribute('x'))))
+        y = int(round(float(det.getAttribute('y'))))
+        entry = lookup.get((t, x, y))
+        if entry:
+            det.setAttribute('intensity', f"{entry['intensity']:.2f}")
+            if 'size' in entry:
+                det.setAttribute('size', f"{entry['size']:.1f}")
+                det.setAttribute('mean_intensity', f"{entry['mean_intensity']:.2f}")
+        else:
+            n_missed += 1
+
+    if n_missed:
+        print(f"  Warning: {n_missed} detections in {Path(xml_path).name} "
+              f"could not be matched to {Path(det_txt_path).name}")
+
+    features_path = Path(xml_path).parent / "tracks_features.xml"
+    with open(features_path, 'wb') as f:
+        f.write(tree.toxml(encoding='utf-8'))
 
 #####
 #
