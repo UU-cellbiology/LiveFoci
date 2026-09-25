@@ -15,7 +15,7 @@ Programmatic:
 """
 
 from pathlib import Path
-from src.lift.general_utils.params_utils import load_params
+from lift.general_utils.params_utils import load_params
 
 
 def run(data_path: str, steps: list = None):
@@ -36,7 +36,7 @@ def run(data_path: str, steps: list = None):
     #### step 1: Nuclei Segmentation 
     if _should_run(1) and (s := p.get('step1_segmentation')):
         print("── Step 1: Nuclei Segmentation")
-        from src.lift import nuc_segmentation
+        from lift import nuc_segmentation
         
         seg          = s.get('segmentation', {})
         prepr        = s.get('preprocessing', {})
@@ -57,7 +57,7 @@ def run(data_path: str, steps: list = None):
     ##### step 2: Nuclei Tracking 
     if _should_run(2) and (s := p.get('step2_tracking')):
         print("── Step 2: Nuclei Tracking")
-        from src.lift import nuclei_trackers
+        from lift import nuclei_trackers
         
         method        = s['method']
         min_length    = s.get('min_length', 20)
@@ -69,7 +69,7 @@ def run(data_path: str, steps: list = None):
     ##### step 3: Cell Cropping
     if _should_run(3) and (s := p.get('step3_cropping')):
         print("── Step 3: Cell Cropping")
-        from src.lift import cut_out_cells
+        from lift import cut_out_cells
         
         for pp in sorted(data_path.glob("*/*/Pos*")):
             try:
@@ -81,7 +81,7 @@ def run(data_path: str, steps: list = None):
     ##### step 4: Registration 
     if _should_run(4) and (s := p.get('step4_registration')):
         print("── Step 4: Registration")
-        from src.lift import registration
+        from lift import registration
         
         method       = s['method']
         preproc_func = _make_preproc(s.get('preprocessing'))
@@ -93,7 +93,7 @@ def run(data_path: str, steps: list = None):
     ##### step 5: Foci Detection 
     if _should_run(5) and (s := p.get('step5_detection')):
         print("── Step 5: Foci Detection")
-        from src.lift import foci_detection
+        from lift import foci_detection
         
         s = dict(s)
         method_params    = s.pop('params', {})
@@ -110,7 +110,7 @@ def run(data_path: str, steps: list = None):
     ##### step 6: Foci Tracking 
     if _should_run(6) and (s := p.get('step6_tracking')):
         print("── Step 6: Foci Tracking")
-        from src.lift import foci_trackers
+        from lift import foci_trackers
         
         method           = s['method']
         min_track_length = s.get('min_track_length', 3)
@@ -126,7 +126,7 @@ def run(data_path: str, steps: list = None):
 # ── helper: reconstruct segmentation method object from YAML ─────────────────
 
 def _make_seg_method(name, params):
-    from src.lift import nuc_segmentation
+    from lift import nuc_segmentation
     if name == 'cellpose_sam':
         return nuc_segmentation.CP_SAM(
             flow_threshold     = params.get('flow_threshold',      0.0),
@@ -145,7 +145,7 @@ def _make_seg_method(name, params):
 def _make_preproc(name):
     if name in (None, 'None', ''):
         return None
-    from src.lift import registration as reg_mod, nuc_segmentation as seg_mod
+    from lift import registration as reg_mod, nuc_segmentation as seg_mod
     mapping = {
         'wavelet_denoise':  reg_mod.wavelet_denoise,
         'threshold':        reg_mod.threshold,

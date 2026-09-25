@@ -124,7 +124,7 @@ def init(data_path: str = None):
     Generate a parameters.yml in data_path based on what is installed.
     Defaults to current working directory if no path given.
     """
-    from lift._helpers import _probe_version
+    from lift._helpers import _probe_version, _has_elastix
     from lift.general_utils.params_utils import yaml_path
     from pathlib import Path
     import yaml
@@ -143,7 +143,7 @@ def init(data_path: str = None):
     has_cp_v3       = cellpose_v is not None and (3, 0) <= cellpose_v < (4, 0)
     has_trackastra  = _probe_version("trackastra") is not None
     has_spotiflow   = _probe_version("spotiflow")  is not None
-    has_elastix     = _probe_version("itk")        is not None
+    has_elastix     = _has_elastix()
 
     # ── pick best available defaults ──────────────────────────────────────────
     if has_cp_sam:
@@ -156,7 +156,7 @@ def init(data_path: str = None):
     nuc_tracker   = "trackastra" if has_trackastra else "IOU"
     foci_detector = "Spotiflow"  if has_spotiflow  else "Wavelets"
     foci_tracker  = "trackastra" if has_trackastra else "GNN"
-    reg_method    = "elastix"    if has_elastix    else "stackreg"
+    reg_method    = "stackreg"   # elastix is opt-in, see _detect_registration_method
 
     # ── build the config dict ─────────────────────────────────────────────────
     config = {}
@@ -212,11 +212,11 @@ def init(data_path: str = None):
     with open(out, "w") as f:
         yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
-    cp_sam_str     = '✓' if has_cp_sam     else '✗  pip install "LiFT[cp-sam]"'
-    cp_v3_str      = '✓' if has_cp_v3      else '✗  pip install "LiFT[cp-v3]"'
-    trackastra_str = '✓' if has_trackastra else '✗  pip install "LiFT[trackastra]"'
-    spotiflow_str  = '✓' if has_spotiflow  else '✗  pip install "LiFT[spotiflow]"'
-    elastix_str    = '✓' if has_elastix    else '✗  pip install "LiFT[elastix]"'
+    cp_sam_str     = '✓' if has_cp_sam     else '✗  pip install "live-foci[cp-sam]"'
+    cp_v3_str      = '✓' if has_cp_v3      else '✗  pip install "live-foci[cp-v3]"'
+    trackastra_str = '✓' if has_trackastra else '✗  pip install "live-foci[trackastra]"'
+    spotiflow_str  = '✓' if has_spotiflow  else '✗  pip install "live-foci[spotiflow]"'
+    elastix_str    = '✓' if has_elastix    else '✗  no bundled binary for this platform'
 
     print(f"\nGenerated parameters.yml at {out}\n")
     print("── installed packages detected ──────────────────────────────")
@@ -224,7 +224,7 @@ def init(data_path: str = None):
     print(f"   cellpose-v3   (cp-v3):    {cp_v3_str}")
     print(f"   trackastra:               {trackastra_str}")
     print(f"   spotiflow:                {spotiflow_str}")
-    print(f"   itk-elastix:              {elastix_str}")
+    print(f"   elastix (bundled):        {elastix_str}")
     print("─────────────────────────────────────────────────────────────")
     print(f"\n── defaults written ─────────────────────────────────────────")
     print(f"   segmentation:  {seg_method or 'none — install cp-sam or cp-v3'}")
@@ -238,22 +238,22 @@ def info():
     """Print installed LiFT-relevant packages and their versions."""
     import importlib
 
+    # (import name, label, install hint)
     packages = [
-        ("cellpose",   "cp-sam / cp-v3", "cellpose>=4.0 or cellpose>=3.0,<4.0"),
-        ("trackastra", "trackastra",      "trackastra>=0.2"),
-        ("spotiflow",  "spotiflow",       "spotiflow>=0.4"),
-        ("itk",        "elastix",         "itk-elastix>=5.3"),
-        ("torch",      "cp-sam/cp-v3",    "installed by cellpose"),
+        ("cellpose",   "cp-sam / cp-v3", 'pip install "live-foci[cp-sam]"  or  "live-foci[cp-v3]"'),
+        ("trackastra", "trackastra",     'pip install "live-foci[trackastra]"'),
+        ("spotiflow",  "spotiflow",      'pip install "live-foci[spotiflow]"'),
+        ("torch",      "core",           'pip install live-foci'),
     ]
 
     print("\n── LiFT environment ─────────────────────────────────────────")
-    for package, extra, note in packages:
+    for package, label, hint in packages:
         try:
             mod = importlib.import_module(package)
             v   = getattr(mod, "__version__", "unknown version")
-            print(f"   ✓  {package:<16} {v:<12}  [{extra}]")
+            print(f"   ✓  {package:<16} {v:<12}  [{label}]")
         except ImportError:
-            print(f"   ✗  {package:<16} not installed   pip install \"LiFT[{extra}]\"")
+            print(f"   ✗  {package:<16} not installed   {hint}")
     print("─────────────────────────────────────────────────────────────\n")
 
 def config_cmd(data_path: str = None, sets: list = None):

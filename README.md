@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="templates/logo.png" alt="LiFT logo" width="300"/>
+  <img src="https://raw.githubusercontent.com/UU-cellbiology/LiveFoci/main/templates/logo.png" alt="LiFT logo" width="300"/>
 </p>
 
 # LiFT – Live Foci Tracking
@@ -11,7 +11,7 @@ LiFT is an end-to-end pipeline for detecting and tracking DNA-damage foci (e.g. 
 ## Pipeline overview
 
 <p align="center">
-  <img src="templates/pipeline_schematic.png" alt="Pipeline schematic" width="750"/>
+  <img src="https://raw.githubusercontent.com/UU-cellbiology/LiveFoci/main/templates/pipeline_schematic.png" alt="Pipeline schematic" width="750"/>
 </p>
 
 The pipeline runs in seven sequential steps:
@@ -250,7 +250,7 @@ lift config data/experiment_name step5_detection.threshold=40
 
  
 
-With no `key=value` arguments, prints the current config.
+With no `key=value` arguments, opens the interactive editor described above.
 
  
 
@@ -488,7 +488,7 @@ Optional preprocessing before segmentation to transform the foci signal into a s
 ### Registration (Step 4)
 | Method | Notes |
 |--------|-------|
-| `stackreg` | StackReg rigid translation (PyStackReg) |
+| `stackreg` | StackReg rigid-body registration, translation + rotation (PyStackReg) |
 | `elastix` | Elastix; supports MSE, MI, and NCC loss functions |
 
 Optional preprocessing for registration: `wavelet_denoise`, `threshold`, `DOG_filter`.

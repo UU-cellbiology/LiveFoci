@@ -5,6 +5,7 @@ from pystackreg import StackReg
 from pystackreg.util import to_uint16
 from lift.general_utils.wavelet_filter import wavelets
 import subprocess
+import tempfile
 
 #####
 #
@@ -85,29 +86,39 @@ def stackreg_registration(stack, preproc_func=None):
     return registered_stack
 
 class ElastixReg(object):
-    
+
     def __init__(self, loss='MSE', preprocess_function=None, previous_initialisation=True):
         super().__init__()
+        from lift._helpers import _elastix_binary
+
         self.preproc_function = preprocess_function
         self.prev_init = previous_initialisation
-        
-        #get directory for this class
-        self.wd = Path(__file__).resolve().parent   # Path.cwd() 
-        elastix_dir = self.wd / "utils_elastix"
-        
-        self.elastix_bin = elastix_dir  / "elastix.exe"
-        self.param_loc = elastix_dir  / f"elastix_parameters_{loss}.txt"
-        self.out_dir = elastix_dir / "Temp"
 
-        self.fixed = elastix_dir  / "Temp" / "fixed.tif"
-        self.moving = elastix_dir  / "Temp" / "moving.tif"  
+        # binary for the current platform (Windows / Linux / macOS)
+        self.elastix_bin = _elastix_binary()
 
-        self.transform_loc = self.out_dir / "prev_transforms"  # location for transform of previous frames for initialisation
-        
+        # parameter files are shipped with the package next to the binaries
+        elastix_dir = Path(__file__).resolve().parent / "utils_elastix"
+        if self.preproc_function:  # multi image registration
+            self.param_loc = elastix_dir / f"elastix_parameters_MultiImage_{loss}.txt"
+        else:
+            self.param_loc = elastix_dir / f"elastix_parameters_{loss}.txt"
+
+        if not self.param_loc.exists():
+            raise FileNotFoundError(f"Parameter file not found: {self.param_loc}")
+
+
+    def _set_paths(self, work_dir):
+        """Set the scratch file locations and elastix command inside *work_dir*."""
+        self.out_dir = work_dir
+        self.fixed = work_dir / "fixed.tif"
+        self.moving = work_dir / "moving.tif"
+        self.transform_loc = work_dir / "prev_transforms"  # location for transform of previous frames for initialisation
+        self.transform_loc.mkdir()
+
         if self.preproc_function:  # change the command to support multi image registration
-            self.fixed_processed = elastix_dir  / "Temp" / "fixed_processed.tif"
-            self.moving_processed = elastix_dir  / "Temp" / "moving_processed.tif"
-            self.param_loc = elastix_dir  / f"elastix_parameters_MultiImage_{loss}.txt"
+            self.fixed_processed = work_dir / "fixed_processed.tif"
+            self.moving_processed = work_dir / "moving_processed.tif"
             self.cmd = [
                 str(self.elastix_bin),
                 "-f0", str(self.fixed),
@@ -117,7 +128,7 @@ class ElastixReg(object):
                 "-p", str(self.param_loc),
                 "-out", str(self.out_dir),
             ]
-        else:    
+        else:
             self.cmd = [
                 str(self.elastix_bin),
                 "-f", str(self.fixed),
@@ -126,18 +137,17 @@ class ElastixReg(object):
                 "-out", str(self.out_dir),
             ]
 
-        self._validate_paths()
 
-    
-    def _validate_paths(self):
-        if not self.elastix_bin.exists():
-            raise FileNotFoundError(f"Elastix binary not found: {self.elastix_bin}")
-
-        if not self.param_loc.exists():
-            raise FileNotFoundError(f"Parameter file not found: {self.param_loc}")
-            
-    
     def register_stack(self, img_stack):
+        # elastix scratch output goes to a fresh temp dir per stack, so the (possibly
+        # read-only) package folder is never written to and parallel runs don't collide
+        with tempfile.TemporaryDirectory(prefix="lift_elastix_") as work_dir:
+            self._set_paths(Path(work_dir))
+            return self._register_stack(img_stack)
+
+
+    def _register_stack(self, img_stack):
+        _info = np.iinfo(img_stack.dtype)
 
         elastix_reg = [img_stack[0].copy()]
         skimage.io.imsave(self.fixed, elastix_reg[-1], check_contrast=False)
@@ -145,11 +155,12 @@ class ElastixReg(object):
         if self.preproc_function:
             processed_stack = self.preproc_function(img_stack)
             skimage.io.imsave(self.fixed_processed, processed_stack[0], check_contrast=False)
-            skimage.io.imsave(self.moving_processed, processed_stack[1], check_contrast=False)  
 
         timepoints, nr, nc = img_stack.shape
-        for tt in range(timepoints-1):   
+        for tt in range(timepoints-1):
             skimage.io.imsave(self.moving, img_stack[tt+1], check_contrast=False)
+            if self.preproc_function:
+                skimage.io.imsave(self.moving_processed, processed_stack[tt+1], check_contrast=False)
 
             if tt > 0 and self.prev_init:
                 prev_transform = self.transform_loc / f"TransformParameters.{tt-1}.txt"
@@ -157,22 +168,22 @@ class ElastixReg(object):
                 reg_command = self.cmd + ["-t0", str(prev_transform)]
             else:
                 reg_command = self.cmd
-            
-            p = subprocess.run(reg_command, capture_output=False, text=True)
-            #print(p.stderr)
-            #print(p.stdout)
 
-            registered_image = skimage.io.imread(self.out_dir / "result.0.tif")
+            p = subprocess.run(reg_command, capture_output=True, text=True)
+            if p.returncode != 0:
+                log = "\n".join((p.stdout + p.stderr).splitlines()[-20:])
+                raise RuntimeError(f"elastix failed on frame {tt+1} (exit code {p.returncode}):\n{log}")
+
+            # elastix writes int16 by default; use float so clipping to the input dtype works
+            registered_image = skimage.io.imread(self.out_dir / "result.0.tif").astype(np.float32)
             elastix_reg.append(registered_image)
 
             # update the fixed image using the registered result
             (self.out_dir / "result.0.tif").replace(self.fixed)
 
             # process the registered image again and update the temporary processed images
-            if self.preproc_function:  
-                _info = np.iinfo(img_stack.dtype)
-
-                processed_reg = wavelet_denoise([
+            if self.preproc_function:
+                processed_reg = self.preproc_function([
                         np.clip(
                             registered_image,
                             _info.min,
@@ -180,20 +191,15 @@ class ElastixReg(object):
                         ).astype(img_stack.dtype)
                     ])
 
-                skimage.io.imsave(self.fixed_processed, processed_reg, check_contrast=False)
-                skimage.io.imsave(self.moving_processed, processed_stack[tt+1], check_contrast=False)  
-        
+                skimage.io.imsave(self.fixed_processed, processed_reg[0], check_contrast=False)
+
         elastix_reg = np.stack(elastix_reg)
-        
+
         elastix_reg = np.clip(
                 elastix_reg,
                 _info.min,
                 _info.max
             ).astype(img_stack.dtype)
-
-        # remove the files of the previous transforms
-        for f in self.transform_loc.glob("TransformParameters.*.txt"):
-            f.unlink()
 
         return elastix_reg
 

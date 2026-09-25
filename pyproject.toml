@@ -56,6 +56,6 @@ include = [
     "pyproject.toml",
     "README.md",
     "LICENSE",
-    "logo.png",
-    "pipeline_schematic.png",
+    "templates/logo.png",
+    "templates/pipeline_schematic.png",
 ]

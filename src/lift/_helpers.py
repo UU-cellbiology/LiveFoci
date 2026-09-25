@@ -84,7 +84,7 @@ def _require(package, extra, what, min_version=None, max_version=None, install_n
     what         : human description, e.g. "Cellpose-SAM segmentation"
     min_version  : tuple of ints, e.g. (4, 0) — inclusive lower bound
     max_version  : tuple of ints, e.g. (5, 0) — exclusive upper bound
-    install_name : pip install name if different from importable, e.g. "itk-elastix"
+    install_name : pip install name if different from importable, e.g. "scikit-image"
     """
     pip_name = install_name or package
 
@@ -93,7 +93,7 @@ def _require(package, extra, what, min_version=None, max_version=None, install_n
     except ImportError:
         raise ImportError(
             f"\n{what} requires '{pip_name}', which is not installed.\n"
-            f"Install it with:  pip install \"lift-foci[{extra}]\"\n"
+            f"Install it with:  pip install \"live-foci[{extra}]\"\n"
         ) from None
 
     if min_version is not None or max_version is not None:
@@ -113,13 +113,13 @@ def _require(package, extra, what, min_version=None, max_version=None, install_n
             raise ImportError(
                 f"\n{what} requires '{pip_name}'>={min_str}, "
                 f"but you have {raw}.\n"
-                f"Upgrade with:  pip install \"lift-foci[{extra}]\"\n"
+                f"Upgrade with:  pip install \"live-foci[{extra}]\"\n"
             ) from None
         if max_version and version >= max_version:
             raise ImportError(
                 f"\n{what} requires '{pip_name}'<{max_str}, "
                 f"but you have {raw}.\n"
-                f"Install the correct version with:  pip install \"lift-foci[{extra}]\"\n"
+                f"Install the correct version with:  pip install \"live-foci[{extra}]\"\n"
             ) from None
 
     return mod
@@ -131,9 +131,8 @@ def _probe_version(package):
     """Return (major, minor) tuple for an installed package, or None if absent."""
     try:
         from importlib.metadata import version, PackageNotFoundError
-        # metadata name may differ from import name e.g. "itk-elastix" vs "itk"
+        # metadata name may differ from import name e.g. "scikit-image" vs "skimage"
         _METADATA_NAMES = {
-            "itk":       "itk-elastix",
             "skimage":   "scikit-image",
             "cv2":       "opencv-python",
         }
@@ -170,19 +169,64 @@ def _require_spotiflow():
         min_version=(0, 4),
     )
 
-def _require_elastix():
-    """Elastix registration wraps a bundled Windows `elastix.exe` binary via
-    subprocess — it does not use the `itk`/`itk-elastix` Python package, so
-    there's nothing to pip-install here. This is a platform check, not a
-    dependency check. Experimental / Windows-only for now."""
+# bundled elastix builds, keyed by (sys.platform prefix, machine), relative to
+# lift/utils_elastix. The Linux/macOS builds find their shared libs through a
+# relative rpath (../lib), so no LD_LIBRARY_PATH / DYLD_LIBRARY_PATH is needed.
+_ELASTIX_BINARIES = {
+    ("win32",  "amd64"):  "elastix.exe",
+    ("linux",  "x86_64"): "elastix_ubuntu/bin/elastix",
+    ("darwin", "arm64"):  "elastix_macos/bin/elastix",
+}
+
+
+def _elastix_binary():
+    """Return the path to the bundled elastix executable for this platform.
+
+    Elastix registration shells out to a bundled binary via subprocess — it
+    needs no extra Python package, so there's nothing to pip-install. Raises RuntimeError on platforms without a bundled build.
+    """
     import os
-    if os.name != "nt":
+    import platform
+    import stat
+    import sys
+    from pathlib import Path
+
+    system  = sys.platform                     # "win32" | "linux" | "darwin"
+    machine = platform.machine().lower()       # "amd64" | "x86_64" | "arm64" | "aarch64"
+
+    rel = _ELASTIX_BINARIES.get((system, machine))
+    if rel is None:
+        supported = ", ".join(f"{s}/{m}" for s, m in _ELASTIX_BINARIES)
         raise RuntimeError(
-            "\nElastix registration is Windows-only (it shells out to a bundled "
-            "elastix.exe) and experimental — it is not available on this platform "
-            "or in the Docker images.\n"
-            "Use method='stackreg' instead, or run natively on Windows.\n"
+            f"\nNo bundled elastix binary for this platform ({system}/{machine}).\n"
+            f"Bundled builds: {supported}.\n"
+            "Use method='stackreg' instead.\n"
         )
+
+    binary = Path(__file__).resolve().parent / "utils_elastix" / rel
+    if not binary.exists():
+        raise FileNotFoundError(f"Elastix binary not found: {binary}")
+
+    # wheels built on Windows lose the executable bit, so restore it on first use
+    if os.name != "nt" and not os.access(binary, os.X_OK):
+        try:
+            binary.chmod(binary.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        except OSError as e:
+            raise PermissionError(
+                f"\nElastix binary is not executable and could not be fixed: {binary}\n"
+                f"Run:  chmod +x \"{binary}\"\n"
+            ) from e
+
+    return binary
+
+
+def _has_elastix():
+    """True if a bundled elastix binary exists for this platform."""
+    try:
+        _elastix_binary()
+        return True
+    except (RuntimeError, OSError):
+        return False
 
 def _require_torch():
     return _require(
@@ -200,8 +244,8 @@ def _detect_seg_method():
         raise ImportError(
             "\nNo segmentation backend is installed.\n"
             "Install one with:\n"
-            "  pip install \"lift-foci[cp-sam]\"   # cellpose >= 4.0 (recommended)\n"
-            "  pip install \"lift-foci[cp-v3]\"    # cellpose >= 3.0, < 4.0\n"
+            "  pip install \"live-foci[cp-sam]\"   # cellpose >= 4.0 (recommended)\n"
+            "  pip install \"live-foci[cp-v3]\"    # cellpose >= 3.0, < 4.0\n"
         )
     if v >= (4, 0):
         return "cellpose_sam"
@@ -210,8 +254,8 @@ def _detect_seg_method():
     raise ImportError(
         f"\nInstalled cellpose {'.'.join(str(x) for x in v)} is too old.\n"
         "Install a supported version with:\n"
-        "  pip install \"lift-foci[cp-sam]\"   # cellpose >= 4.0 (recommended)\n"
-        "  pip install \"lift-foci[cp-v3]\"    # cellpose >= 3.0, < 4.0\n"
+        "  pip install \"live-foci[cp-sam]\"   # cellpose >= 4.0 (recommended)\n"
+        "  pip install \"live-foci[cp-v3]\"    # cellpose >= 3.0, < 4.0\n"
     )
 
 
@@ -239,10 +283,10 @@ def _detect_foci_detector():
 def _detect_registration_method():
     """Return best available registration method.
 
-    'elastix' is intentionally never auto-selected here: it's Windows-only
-    and experimental (see _require_elastix). Users who specifically want it
-    must opt in explicitly via parameters.yml (step4_registration.method:
-    elastix) on a Windows machine.
+    'elastix' is intentionally never auto-selected here: it's experimental
+    and only bundled for some platforms (see _elastix_binary). Users who
+    specifically want it must opt in explicitly via parameters.yml
+    (step4_registration.method: elastix).
     """
     return "stackreg"   # always available, portable
 
