@@ -94,6 +94,10 @@ pip install live-foci
 
 pip install "live-foci[cp-sam]"
 
+# or with multiple optional extras, e.g. GPU segmentation and the GUI
+
+pip install "live-foci[cp-sam,app]"
+
 ```
 
 
@@ -537,14 +541,9 @@ Intermediate and final outputs are written alongside the input inside each `Pos*
 
 ---
 
-## Installation
-
-> **Note:** Detailed installation instructions will be added here.
-
----
 
 ## Citation
 
 If you use LiFT in your research, please cite:
 
-> *Citation will be added here upon publication.*
+H. de Wolf, T., Engbers, P.A.M., Perrin, J. et al. LiFT: Live foci tracking for quantitative analysis of DNA damage dynamics. Sci Rep (2026). https://doi.org/10.1038/s41598-026-71338-z
