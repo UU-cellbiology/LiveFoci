@@ -56,8 +56,7 @@ def segment_folderlist(folders_list, method, preproc_function=None, min_area=100
         print("processing:", folder)
 
         # load the data
-        raw_paths = list(folder.glob("*.tif"))
-        raw_data = load_sequence.load(folder)
+        raw_data, raw_paths = load_sequence.load(folder, return_paths=True)
 
         # run the preprocessing step
         processed = preprocessing(raw_data, preproc_function, **kwargs)
