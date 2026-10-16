@@ -14,7 +14,7 @@ from pathlib import Path
 # once into a local cache on first use.
 
 _ZENODO_HOST = "zenodo.org"
-_ZENODO_RECORD_ID = "23264206"   # update whenever a new Zenodo version is published
+_ZENODO_RECORD_ID = "23417069"   # update whenever a new Zenodo version is published
 _BINARY_BASE_URL = f"https://{_ZENODO_HOST}/records/{_ZENODO_RECORD_ID}/files"
 
 # name -> (archive file name on Zenodo, expected SHA-256).
