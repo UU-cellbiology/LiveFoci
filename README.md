@@ -29,15 +29,20 @@ The pipeline runs in seven sequential steps:
 
 ## Five ways to run LiFT
 
-### 1. Interactive GUI — `LiFT_app.py`
+### 1. Interactive GUI: `LiFT_app.py`
 
-A browser-based interface. Each step has a dedicated page where you can tune parameters, run a preview on a randomly selected cell, and then launch the full run on all data with a progress bar.
+A browser-based interface. Each step has its own page where you can tune parameters, preview the result on a randomly selected cell, and then run the full analysis on all data with a progress bar.
+
+**Prerequisites:** install the PyPI package (see [4. Python Package](#4-python-package)) and [clone the repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) to your local machine.
 
 ```bash
+pip install live-foci
+git clone https://github.com/UU-cellbiology/LiveFoci.git
+cd LiveFoci
 python LiFT_app.py
 ```
 
-Then open [http://localhost:5000](http://localhost:5000) in your browser. Work through steps 1–6 in order. When you click **Run all** for any step, the current parameters are automatically saved to `parameters.yml` inside your data folder.
+Then open [http://localhost:5000](http://localhost:5000) in your browser and work through pipeline steps 1-6 in order. Clicking **Run all** on any step automatically saves the current parameters to `parameters.yml` in your data folder.
 
 ---
 
