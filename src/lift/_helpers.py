@@ -171,13 +171,13 @@ def _require_spotiflow():
 
 # bundled elastix builds, keyed by (sys.platform prefix, machine), relative to
 # lift/utils_elastix. The Linux/macOS builds find their shared libs through a
-# relative rpath (../lib), so no LD_LIBRARY_PATH / DYLD_LIBRARY_PATH is needed.
+# relative rpath (../lib). The Windows build keeps its DLL next to the
+# executables in bin/, where Windows looks for it.
 _ELASTIX_BINARIES = {
-    ("win32",  "amd64"):  "elastix.exe",
+    ("win32",  "amd64"):  "elastix_windows/bin/elastix.exe",
     ("linux",  "x86_64"): "elastix_ubuntu/bin/elastix",
     ("darwin", "arm64"):  "elastix_macos/bin/elastix",
 }
-
 
 def _elastix_binary():
     """Return the path to the bundled elastix executable for this platform.
