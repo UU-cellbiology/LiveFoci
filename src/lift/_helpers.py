@@ -10,8 +10,8 @@ import importlib
 # local cache on first use.
 
 
-_ZENODO_HOST = "sandbox.zenodo.org"  
-_ZENODO_RECORD_ID = "547985"         
+_ZENODO_HOST = "zenodo.org"  
+_ZENODO_RECORD_ID = "23264206"         
 _BINARY_BASE_URL = f"https://{_ZENODO_HOST}/records/{_ZENODO_RECORD_ID}/files"
 
 _BINARY_ARCHIVES = {
