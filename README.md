@@ -58,7 +58,7 @@ jupyter notebook LiFT_notebook.ipynb
 
 ### 3. Command-line runner — `LiFT.py`
 
-For this method, you can simply clone the entire repository and execute from that local directory. 
+For this method, you can simply clone the entire repository and execute from that local directory. Perform the same steps to clone and install the package as in [1. Interactive GUI: `LiFT_app.py`](#1-interactive-gui-lift_apppy)
 
 Reads the `parameters.yml` written by the GUI or notebook and re-runs the full pipeline on a new data folder with identical settings. More experienced users can also write a custom `parameters.yml` with their desired settings. Intended for batch reproduction and HPC submission.
 
